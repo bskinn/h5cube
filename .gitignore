@@ -87,3 +87,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# CUBE and h5 files
+*.cube
+*.h5
+
