@@ -92,3 +92,12 @@ ENV/
 *.cube
 *.h5
 
+# gedit temp/bak files
+*.rst~
+*.py~
+.gitignore~
+
+# Misc .bak files
+*.bak
+
+
