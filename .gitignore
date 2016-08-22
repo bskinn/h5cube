@@ -91,6 +91,7 @@ ENV/
 # CUBE and h5 files
 *.cube
 *.h5
+*.h5cube
 
 # gedit temp/bak files
 *.rst~
