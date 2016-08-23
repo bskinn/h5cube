@@ -24,6 +24,9 @@ class AP(object):
     PREC = 'precision'
     ABSMODE = 'absolute'
     SIGNMODE = 'signed'
+    NOTHRESH = 'nothresh'
+    MINMAX = 'minmax'
+    ISOFACTOR = 'isofactor'
 
 # h5py constants
 class H5(object):
@@ -44,6 +47,7 @@ class DEF(object):
     PREC = 5
     COMP = 9
     DEL = False
+    THRESH = False
 
 
 def exp_format(val, prec):
@@ -61,7 +65,8 @@ def exp_format(val, prec):
     return out
 
 
-def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC):
+def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
+               thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None):
     """ [Docstring]
 
     """
@@ -135,6 +140,15 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC):
     logdataarr = np.zeros(dims)
     signsarr = np.zeros(dims)
 
+    # Preassign the calculated minmax values if isofactored thresh
+    # is enabled
+    if thresh and isofactor is not None:
+        # Populate minmax with the isovalue/factor based
+        # threshold values
+        minmax = np.zeros((2,))
+        minmax[0] = isofactor[0] / isofactor[1]
+        minmax[1] = isofactor[0] * isofactor[1]
+
     # Loop over the respective dimensions
     for x in range(dims[0]):
         for y in range(dims[1]):
@@ -143,6 +157,19 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC):
                     val = float(next(dataiter).group(0))
                 except StopIteration as e:
                     raise ValueError("Insufficient data in CUBE file") from e
+
+                # Threshold, if indicated
+                if thresh:
+                    if signed:
+                        if val < minmax[0]:
+                            val = minmax[0]
+                        elif val > minmax[1]:
+                            val = minmax[1]
+                    else:
+                        if np.abs(val) < minmax[0]:
+                            val = np.sign(val) * minmax[0]
+                        elif np.abs(val) > minmax[1]:
+                            val = np.sign(val) * minmax[1]
 
                 signsarr[x, y, z] = np.sign(val)
                 logdataarr[x, y, z] = np.log10(np.abs(val))
@@ -235,6 +262,37 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     if delsrc:
         os.remove(h5path)
 
+def validate_minmax(minmax, signed):
+    """ [Docstring]
+
+    """
+
+    import argparse as ap
+
+    if minmax[0] >= minmax[1]:
+        raise ap.ArgumentTypeError("'max' is not greater than 'min'")
+
+    if not signed and minmax[0] < 0:
+        raise ap.ArgumentTypeError("Negative 'min' in absolute "
+                                   "thresholding mode")
+
+def validate_isofactor(isofactor, signed):
+    """ [Docstring]
+
+    """
+
+    import argparse as ap
+
+    if isofactor[0] == 0.0:
+        raise ap.ArgumentTypeError("'isovalue' cannot be zero")
+
+    if isofactor[1] <= 1.0:
+        raise ap.ArgumentTypeError("'factor' must be greater than one")
+
+    if not signed and isofactor[0] < 0:
+        raise ap.ArgumentTypeError("Negative 'isovalue' in absolute "
+                                   "thresholding mode")
+    
 
 def get_parser():
     """ [Docstring]
@@ -247,16 +305,21 @@ def get_parser():
     prs = ap.ArgumentParser(description="Gaussian CUBE (de)compression "
                                         "via h5py")
 
-    # Compression and decompression groups
+    # Compression group
     gp_comp = prs.add_argument_group(title="compression options")
+
+    # Thresholding "subgroups" within compression
+    gp_threshmode = prs.add_argument_group(title="compression thresholding mode")
+    gp_threshvals = prs.add_argument_group(title="compression thresholding values")
+
+    # Decompression group
     gp_decomp = prs.add_argument_group(title="decompression options")
 
-    # Thresholding subgroup within compression
-    gp_thresh = gp_comp.add_argument_group(title="thresholding options")
+
 
     # Mutually exclusive subgroups for the compression operation
-    meg_threshmode = gp_thresh.add_mutually_exclusive_group()
-#    meg_threshvals = gp_comp.add_mutually_exclusive_group()
+    meg_threshmode = gp_threshmode.add_mutually_exclusive_group()
+    meg_threshvals = gp_threshvals.add_mutually_exclusive_group()
 
     # Argument for the filename (core parser)
     prs.add_argument(AP.PATH, action='store',
@@ -285,18 +348,47 @@ def get_parser():
                          help="gzip truncation width for volumetric "
                               "data (1-15, default {0})".format(DEF.TRUNC))
 
-    # Absolute thresholding mode (compress -- threshold)
+    # Absolute thresholding mode (compress -- threshold mode)
     meg_threshmode.add_argument('-{0}'.format(AP.ABSMODE[0]),
                                 '--{0}'.format(AP.ABSMODE),
                                 action='store_true',
                                 help="absolute-value thresholding "
                                      "mode")
-    # Signed thresholding mode (compress -- threshold)
+
+    # Signed thresholding mode (compress -- threshold mode)
     meg_threshmode.add_argument('-{0}'.format(AP.SIGNMODE[0]),
                                 '--{0}'.format(AP.SIGNMODE),
                                 action='store_true',
                                 help="signed-value thresholding "
                                      "mode")
+
+    # Thresholding mode disabled (compress -- threshold mode)
+    meg_threshmode.add_argument('-{0}'.format(AP.NOTHRESH[0]),
+                                '--{0}'.format(AP.NOTHRESH),
+                                action='store_true',
+                                help="thresholding disabled (default)")
+
+
+    # Min/max threshold specification (compress -- threshold values)
+    meg_threshvals.add_argument('-{0}'.format(AP.MINMAX[0]),
+                                '--{0}'.format(AP.MINMAX),
+                                action='store',
+                                default=None,
+                                nargs=2,
+                                metavar='#',
+                                help="min and max values for "
+                                     "threshold specification")
+
+    # Isovalue/factor threshold specification (compress -- threshold values)
+    meg_threshvals.add_argument('-{0}'.format(AP.ISOFACTOR[0]),
+                                '--{0}'.format(AP.ISOFACTOR),
+                                action='store',
+                                default=None,
+                                nargs=2,
+                                metavar='#',
+                                help="Isovalue and multiplicative "
+                                     "factor values for "
+                                     "threshold specification")
 
     # Data block output precision (decompress)
     gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
@@ -312,6 +404,8 @@ def get_parser():
 
 def main():
 
+    import argparse as ap
+    import numpy as np
     import os
     import sys
 
@@ -331,15 +425,39 @@ def main():
     comp = params[AP.COMPRESS]
     trunc = params[AP.TRUNC]
     prec = params[AP.PREC]
+    signed = params[AP.SIGNMODE]
+    minmax = params[AP.MINMAX]
+    isofactor = params[AP.ISOFACTOR]
 
+    if minmax:
+        minmax = np.float_(minmax)
+        validate_minmax(minmax, signed)
+    if isofactor:
+        isofactor = np.float_(isofactor)
+        validate_isofactor(isofactor, signed)
+    
+    # Check file extension as indication of execution mode
     if ext == '.h5cube':
+        # Decompression mode
         h5_to_cube(path, delsrc=delsrc, prec=prec)
+
     elif ext in ['.cube', '.cub']:
-        cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc)
+        # Compression mode
+        if minmax is not None:
+            # Min/max thresholding
+            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc,
+                       thresh=True, signed=signed, minmax=minmax)
+        elif isofactor is not None:
+            # Isovalue thresholding
+            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc,
+                       thresh=True, signed=signed, isofactor=isofactor)
+        else:
+            # No thresholding
+            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc)
+
     else:
         print("File extension not recognized. Exiting...")
 
 
 if __name__ == '__main__':
     main()
-
