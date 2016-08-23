@@ -22,6 +22,8 @@ class AP(object):
     COMPRESS = 'compress'
     TRUNC = 'truncate'
     PREC = 'precision'
+    ABSMODE = 'absolute'
+    SIGNMODE = 'signed'
 
 # h5py constants
 class H5(object):
@@ -249,6 +251,13 @@ def get_parser():
     gp_comp = prs.add_argument_group(title="compression options")
     gp_decomp = prs.add_argument_group(title="decompression options")
 
+    # Thresholding subgroup within compression
+    gp_thresh = gp_comp.add_argument_group(title="thresholding options")
+
+    # Mutually exclusive subgroups for the compression operation
+    meg_threshmode = gp_thresh.add_mutually_exclusive_group()
+#    meg_threshvals = gp_comp.add_mutually_exclusive_group()
+
     # Argument for the filename (core parser)
     prs.add_argument(AP.PATH, action='store',
                      help="path to .(h5)cube file to be (de)compressed")
@@ -263,24 +272,41 @@ def get_parser():
                          '--{0}'.format(AP.COMPRESS),
                          action='store', default=DEF.COMP, type=int,
                          choices=list(range(10)),
+                         metavar='#',
                          help="gzip compression level for volumetric "
-                              "data (default {0})".format(DEF.COMP))
+                              "data (0-9, default {0})".format(DEF.COMP))
 
     # gzip truncation level (compress)
     gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
                          '--{0}'.format(AP.TRUNC),
                          action='store', default=DEF.TRUNC, type=int,
-                         choices=list(range(1,10)),
+                         choices=list(range(1,16)),
+                         metavar='#',
                          help="gzip truncation width for volumetric "
-                              "data (default {0})".format(DEF.TRUNC))
+                              "data (1-15, default {0})".format(DEF.TRUNC))
+
+    # Absolute thresholding mode (compress -- threshold)
+    meg_threshmode.add_argument('-{0}'.format(AP.ABSMODE[0]),
+                                '--{0}'.format(AP.ABSMODE),
+                                action='store_true',
+                                help="absolute-value thresholding "
+                                     "mode")
+    # Signed thresholding mode (compress -- threshold)
+    meg_threshmode.add_argument('-{0}'.format(AP.SIGNMODE[0]),
+                                '--{0}'.format(AP.SIGNMODE),
+                                action='store_true',
+                                help="signed-value thresholding "
+                                     "mode")
 
     # Data block output precision (decompress)
     gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
                            '--{0}'.format(AP.PREC),
                            action='store', default=DEF.PREC, type=int,
                            choices=list(range(16)),
+                           metavar='#',
                            help="volumetric data block output "
-                                "precision (default {0})".format(DEF.PREC))
+                                "precision (0-15, "
+                                "default {0})".format(DEF.PREC))
     return prs
 
 
@@ -307,12 +333,13 @@ def main():
     prec = params[AP.PREC]
 
     if ext == '.h5cube':
-        h5_to_cube(path, delsrc, prec)
+        h5_to_cube(path, delsrc=delsrc, prec=prec)
     elif ext in ['.cube', '.cub']:
-        cube_to_h5(path, delsrc, comp, trunc)
+        cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc)
     else:
         print("File extension not recognized. Exiting...")
 
 
 if __name__ == '__main__':
     main()
+
