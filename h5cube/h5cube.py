@@ -16,23 +16,32 @@
 
 
 # Argparse constants
-AP_PATH = 'path'
-AP_DELETE = 'delete'
-AP_COMPRESS = 'compress'
-AP_TRUNC = 'truncate'
-AP_PREC = 'precision'
+class AP(object):
+    PATH = 'path'
+    DELETE = 'delete'
+    COMPRESS = 'compress'
+    TRUNC = 'truncate'
+    PREC = 'precision'
 
 # h5py constants
-H5_COMMENT1 = 'COMMENT1'
-H5_COMMENT2 = 'COMMENT2'
-H5_NATOMS = 'NATOMS'
-H5_ORIGIN = 'ORIGIN'
-H5_XAXIS = 'XAXIS'
-H5_YAXIS = 'YAXIS'
-H5_ZAXIS = 'ZAXIS'
-H5_GEOM = 'GEOM'
-H5_SIGNS = 'SIGNS'
-H5_LOGDATA = 'LOGDATA'
+class H5(object):
+    COMMENT1 = 'COMMENT1'
+    COMMENT2 = 'COMMENT2'
+    NATOMS = 'NATOMS'
+    ORIGIN = 'ORIGIN'
+    XAXIS = 'XAXIS'
+    YAXIS = 'YAXIS'
+    ZAXIS = 'ZAXIS'
+    GEOM = 'GEOM'
+    SIGNS = 'SIGNS'
+    LOGDATA = 'LOGDATA'
+
+# Default values
+class DEF(object):
+    TRUNC = 5
+    PREC = 5
+    COMP = 9
+    DEL = False
 
 
 def exp_format(val, prec):
@@ -46,14 +55,11 @@ def exp_format(val, prec):
     # Capital 'E' for the exponent.
     out = " {{: #1.{0}E}}".format(prec).format(val)
 
-    # Insert zeros as needed to make a three-digit exponent
-    out = out[:(6 + prec)] + "".zfill(9 + prec - len(out)) + out[(6 + prec):]
-
     # Return the results
     return out
 
 
-def cube_to_h5(cubepath, delsrc, comp, trunc):
+def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC):
     """ [Docstring]
 
     """
@@ -61,6 +67,7 @@ def cube_to_h5(cubepath, delsrc, comp, trunc):
     import h5py as h5
     import itertools as itt
     import numpy as np
+    import os
     import re
 
     with open(cubepath) as f:
@@ -68,26 +75,26 @@ def cube_to_h5(cubepath, delsrc, comp, trunc):
 
     datalines = iter(filedata.splitlines())
 
-    h5path = cubepath[:-4] + 'h5' + cubepath[-4:]
+    h5path = os.path.splitext(cubepath)[0] + '.h5cube'
     if os.path.isfile(h5path):
         os.remove(h5path)
 
     hf = h5.File(h5path)
 
     # Comment lines
-    hf.create_dataset(H5_COMMENT1, data=next(datalines))
-    hf.create_dataset(H5_COMMENT2, data=next(datalines))
+    hf.create_dataset(H5.COMMENT1, data=next(datalines))
+    hf.create_dataset(H5.COMMENT2, data=next(datalines))
 
     # Number of atoms and origin
     elements = iter(next(datalines).split())
     natoms = abs(int(next(elements)))
-    hf.create_dataset(H5_NATOMS, data=natoms)
-    hf.create_dataset(H5_ORIGIN, data=np.array([float(next(elements))
+    hf.create_dataset(H5.NATOMS, data=natoms)
+    hf.create_dataset(H5.ORIGIN, data=np.array([float(next(elements))
                                              for i in range(3)]))
 
     # Dimensions and vectors
     dims = []
-    for dsname in [H5_XAXIS, H5_YAXIS, H5_ZAXIS]:
+    for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
         elements = iter(next(datalines).split())
         hf.create_dataset(dsname, data=np.array([float(next(elements))
                                                  for i in range(4)]))
@@ -101,7 +108,7 @@ def cube_to_h5(cubepath, delsrc, comp, trunc):
         for j in range(5):
             geom[i, j] = elements[j]
 
-    hf.create_dataset(H5_GEOM, data=geom)
+    hf.create_dataset(H5.GEOM, data=geom)
 
     # Volumetric field data
     # Create one big iterator over a scientific notation regular
@@ -147,9 +154,9 @@ def cube_to_h5(cubepath, delsrc, comp, trunc):
         raise ValueError("CUBE file dataset not exhausted")
 
     # Store the arrays, compressed
-    hf.create_dataset(H5_LOGDATA, data=logdataarr, compression="gzip",
+    hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
                       compression_opts=comp, shuffle=True, scaleoffset=trunc)
-    hf.create_dataset(H5_SIGNS, data=signsarr, compression="gzip",
+    hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
                       compression_opts=comp, shuffle=True)
 
     # Close the h5 file
@@ -160,10 +167,10 @@ def cube_to_h5(cubepath, delsrc, comp, trunc):
         os.remove(cubepath)
 
 
-def h5_to_cube(h5path, delsrc, prec):
+def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     """ [Docstring]
 
-    Less error/syntax checking here since presumably the data was 
+    Less error/syntax checking here since presumably the data was
     parsed for validity when the .h5cube file was created.
     """
 
@@ -175,7 +182,7 @@ def h5_to_cube(h5path, delsrc, prec):
     hdr_4val = "{:5d}   {: 1.6f}   {: 1.6f}   {: 1.6f}   {: 1.6f}"
 
     # Define the uncompressed filename
-    cubepath = h5path[:-6] + h5path[-4:]
+    cubepath = os.path.splitext(h5path)[0] + '.cube'
 
     # Open the source file
     hf = h5.File(h5path)
@@ -187,37 +194,37 @@ def h5_to_cube(h5path, delsrc, prec):
     # Open the output file for writing as a context manager
     with open(cubepath, 'w') as f:
         # Write the two comment lines
-        f.write(hf[H5_COMMENT1].value + os.linesep)
-        f.write(hf[H5_COMMENT2].value + os.linesep)
+        f.write(hf[H5.COMMENT1].value + '\n')
+        f.write(hf[H5.COMMENT2].value + '\n')
 
         # Write the number-of-atoms and system origin line
-        natoms = hf[H5_NATOMS].value
-        f.write(hdr_3val.format(natoms, *(hf[H5_ORIGIN].value)) + os.linesep)
+        natoms = hf[H5.NATOMS].value
+        f.write(hdr_3val.format(natoms, *(hf[H5.ORIGIN].value)) + '\n')
 
         # Write the three axes lines
         dims = []
-        for dsname in [H5_XAXIS, H5_YAXIS, H5_ZAXIS]:
+        for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
             ds = hf[dsname].value
-            f.write(hdr_3val.format(int(ds[0]), *ds[1:]) + os.linesep)
+            f.write(hdr_3val.format(int(ds[0]), *ds[1:]) + '\n')
             dims.append(int(ds[0]))
 
         # Write the geometry
-        geom = hf[H5_GEOM].value
+        geom = hf[H5.GEOM].value
         for i in range(natoms):
-            f.write(hdr_4val.format(int(geom[i,0]), *geom[i,1:]) + os.linesep)
+            f.write(hdr_4val.format(int(geom[i,0]), *geom[i,1:]) + '\n')
 
         # Write the data blocks
-        signs = hf[H5_SIGNS].value
-        logvals = hf[H5_LOGDATA].value
+        signs = hf[H5.SIGNS].value
+        logvals = hf[H5.LOGDATA].value
         for x in range(dims[0]):
             for y in range(dims[1]):
                 for z in range(dims[2]):
-                    f.write(exp_format(signs[x, y, z] * 
+                    f.write(exp_format(signs[x, y, z] *
                                        10.**logvals[x, y, z], prec))
                     if z % 6 == 5:
-                        f.write(os.linesep)
+                        f.write('\n')
 
-                f.write(os.linesep)
+                f.write('\n')
 
     # Close the h5 file
     hf.close()
@@ -243,38 +250,41 @@ def get_parser():
     gp_decomp = prs.add_argument_group(title="decompression options")
 
     # Argument for the filename (core parser)
-    prs.add_argument(AP_PATH, action='store',
-                     help="Path to file to be (de)compressed")
+    prs.add_argument(AP.PATH, action='store',
+                     help="path to .(h5)cube file to be (de)compressed")
 
     # Argument to delete the source file; default is to keep (core)
-    prs.add_argument('-{0}'.format(AP_DELETE[0]), '--{0}'.format(AP_DELETE),
+    prs.add_argument('-{0}'.format(AP.DELETE[0]), '--{0}'.format(AP.DELETE),
                      action='store_true',
-                     help="Delete the source file after (de)compression")
+                     help="delete the source file after (de)compression")
 
     # gzip compression level (compress)
-    gp_comp.add_argument('-{0}'.format(AP_COMPRESS[0]),
-                         '--{0}'.format(AP_COMPRESS),
-                         action='store', default=9, type=int,
+    gp_comp.add_argument('-{0}'.format(AP.COMPRESS[0]),
+                         '--{0}'.format(AP.COMPRESS),
+                         action='store', default=DEF.COMP, type=int,
                          choices=list(range(10)),
-                         help="gzip compression level (default 9)")
+                         help="gzip compression level for volumetric "
+                              "data (default {0})".format(DEF.COMP))
 
     # gzip truncation level (compress)
-    gp_comp.add_argument('-{0}'.format(AP_TRUNC[0]),
-                         '--{0}'.format(AP_TRUNC),
-                         action='store', default=5, type=int,
+    gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
+                         '--{0}'.format(AP.TRUNC),
+                         action='store', default=DEF.TRUNC, type=int,
                          choices=list(range(1,10)),
-                         help="gzip truncation width (default 5)")
+                         help="gzip truncation width for volumetric "
+                              "data (default {0})".format(DEF.TRUNC))
 
     # Data block output precision (decompress)
-    gp_decomp.add_argument('-{0}'.format(AP_PREC[0]),
-                           '--{0}'.format(AP_PREC),
-                           action='store', default=5, type=int,
+    gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
+                           '--{0}'.format(AP.PREC),
+                           action='store', default=DEF.PREC, type=int,
                            choices=list(range(16)),
-                           help="Data block output precision (default 5)")
+                           help="volumetric data block output "
+                                "precision (default {0})".format(DEF.PREC))
     return prs
 
 
-if __name__ == '__main__':
+def main():
 
     import os
     import sys
@@ -287,21 +297,22 @@ if __name__ == '__main__':
     sys.argv = sys.argv[:1] + args_left
 
     # Retrieve path and file extension
-    path = params[AP_PATH]
+    path = params[AP.PATH]
     ext = os.path.splitext(path)[1]
 
     # Retrieve other parameters
-    delsrc = params[AP_DELETE]
-    comp = params[AP_COMPRESS]
-    trunc = params[AP_TRUNC]
-    prec = params[AP_PREC]
+    delsrc = params[AP.DELETE]
+    comp = params[AP.COMPRESS]
+    trunc = params[AP.TRUNC]
+    prec = params[AP.PREC]
 
     if ext == '.h5cube':
         h5_to_cube(path, delsrc, prec)
-    elif ext == '.cube':
+    elif ext in ['.cube', '.cub']:
         cube_to_h5(path, delsrc, comp, trunc)
     else:
         print("File extension not recognized. Exiting...")
 
 
-
+if __name__ == '__main__':
+    main()
