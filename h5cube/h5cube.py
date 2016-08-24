@@ -309,8 +309,10 @@ def get_parser():
     gp_comp = prs.add_argument_group(title="compression options")
 
     # Thresholding "subgroups" within compression
-    gp_threshmode = prs.add_argument_group(title="compression thresholding mode")
-    gp_threshvals = prs.add_argument_group(title="compression thresholding values")
+    gp_threshmode = prs.add_argument_group(title="compression thresholding "
+                                                 "mode (mutually exclusive)")
+    gp_threshvals = prs.add_argument_group(title="compression thresholding "
+                                                 "values (mutually exclusive)")
 
     # Decompression group
     gp_decomp = prs.add_argument_group(title="decompression options")
