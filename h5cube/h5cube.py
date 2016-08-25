@@ -422,19 +422,33 @@ def main():
     path = params[AP.PATH]
     ext = os.path.splitext(path)[1]
 
+    # Check for existence
+    if not os.path.isfile(path):
+        print("File not found. Exiting...")
+        sys.exit(1)
+
     # Retrieve other parameters
     delsrc = params[AP.DELETE]
     comp = params[AP.COMPRESS]
     trunc = params[AP.TRUNC]
     prec = params[AP.PREC]
+    absolute = params[AP.ABSMODE]
     signed = params[AP.SIGNMODE]
+    nothresh = params[AP.NOTHRESH]
     minmax = params[AP.MINMAX]
     isofactor = params[AP.ISOFACTOR]
 
-    if minmax:
+    # Complain if nothresh specified but minmax or isofactor provided
+    if nothresh and not (minmax is None and isofactor is None):
+        raise ap.ArgumentTypeError("Invalid: Thresholding parameter specified "
+                                   "with --nothresh")
+
+
+    # Convert and validate the thresholding inputs
+    if minmax is not None:
         minmax = np.float_(minmax)
         validate_minmax(minmax, signed)
-    if isofactor:
+    if isofactor is not None:
         isofactor = np.float_(isofactor)
         validate_isofactor(isofactor, signed)
     
@@ -459,7 +473,9 @@ def main():
 
     else:
         print("File extension not recognized. Exiting...")
+        sys.exit(1)
 
 
 if __name__ == '__main__':
     main()
+
