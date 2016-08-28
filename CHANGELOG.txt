@@ -1,0 +1,34 @@
+Changelog for h5cube
+
+
+v0.1
+================================================================================
+
+Initial beta release, without documentation or a test suite. Below functionality
+believed functional and substantially bug-free
+
+File extensions are fixed:
+
+ - .h5cube files (case insensitive) are decompressed
+ - .cube and .cub files (case insensitive) are compressed
+
+Clobber of an existing output file always occurs. No options are available for
+selecting/changing the name of the output file.
+
+* General options
+  --delete, optionally delete the source file after (de)compression
+
+* Compression options
+  --compress, gzip compression level within the HDF5 file
+  --truncate, truncated precision of the log-10 mantissa of each data value
+  * Thresholding options
+    --absolute / --signed, whether indicated threshold values are applied to
+                           the signed value or the absolute magnitude
+    --minmax / --isofactor, whether the threshold values are specified by
+                            explicit min/max values, or a central isovalue
+			    and a multiplicative factor
+
+* Decompression options
+  --precision, the significant figures past the decimal point output for
+               each data point
+

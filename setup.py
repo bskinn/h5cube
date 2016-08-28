@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='h5cube',
     version='0.1',
-#    requires='h5py something, pending tox',
+    requires='h5py (>=2.4)',
     packages=['h5cube'],
     url='https://www.github.com/bskinn/h5cube',
     license='MIT License',
