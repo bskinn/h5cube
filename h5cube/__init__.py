@@ -16,6 +16,6 @@
 
 from __future__ import absolute_import
 
-from .h5cube import cube_to_h5, h5_to_cube, H5
+from .h5cube import cube_to_h5, h5_to_cube, H5, EXIT
 
 __version__ = '0.1'

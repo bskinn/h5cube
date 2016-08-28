@@ -49,8 +49,14 @@ class DEF(object):
     DEL = False
     THRESH = False
 
+# Exit codes
+class EXIT(object):
+    GENERIC = 1
+    CMDLINE = 2
+    FILEREAD = 4
+    FILEWRITE = 8
 
-def exp_format(val, prec):
+def _exp_format(val, prec):
     """ [Docstring]
 
     """
@@ -77,15 +83,23 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
     import os
     import re
 
+    # Default compression and truncations, if no value(s) passed on commandline
+    if comp is None:
+        comp = DEF.COMP
+    if trunc is None:
+        trunc = DEF.TRUNC
+
+    # Pull the file contents and make an iterator
     with open(cubepath) as f:
         filedata = f.read()
-
     datalines = iter(filedata.splitlines())
 
+    # Construct the .h5cube path
     h5path = os.path.splitext(cubepath)[0] + '.h5cube'
+
+    # Clobber to new file
     if os.path.isfile(h5path):
         os.remove(h5path)
-
     hf = h5.File(h5path)
 
     # Comment lines
@@ -206,6 +220,10 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     import h5py as h5
     import os
 
+    # Default precision value, if no value passed on commandline
+    if prec is None:
+        prec = DEF.PREC
+
     # Define the header block substitution strings
     hdr_3val = "{:5d}   {: 1.6f}   {: 1.6f}   {: 1.6f}"
     hdr_4val = "{:5d}   {: 1.6f}   {: 1.6f}   {: 1.6f}   {: 1.6f}"
@@ -248,7 +266,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
         for x in range(dims[0]):
             for y in range(dims[1]):
                 for z in range(dims[2]):
-                    f.write(exp_format(signs[x, y, z] *
+                    f.write(_exp_format(signs[x, y, z] *
                                        10.**logvals[x, y, z], prec))
                     if z % 6 == 5:
                         f.write('\n')
@@ -262,39 +280,45 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     if delsrc:
         os.remove(h5path)
 
-def validate_minmax(minmax, signed):
+def _validate_minmax(minmax, signed):
     """ [Docstring]
 
     """
 
     import argparse as ap
+    import sys
 
     if minmax[0] >= minmax[1]:
-        raise ap.ArgumentTypeError("'max' is not greater than 'min'")
+        print("Error: 'max' is not greater than 'min'")
+        sys.exit(EXIT.CMDLINE)
 
     if not signed and minmax[0] < 0:
-        raise ap.ArgumentTypeError("Negative 'min' in absolute "
-                                   "thresholding mode")
+        print("Error: Negative 'min' in absolute thresholding mode")
+        sys.exit(EXIT.CMDLINE)
 
-def validate_isofactor(isofactor, signed):
+
+def _validate_isofactor(isofactor, signed):
     """ [Docstring]
 
     """
 
     import argparse as ap
+    import sys
 
     if isofactor[0] == 0.0:
-        raise ap.ArgumentTypeError("'isovalue' cannot be zero")
+        print("Error: 'isovalue' cannot be zero")
+        sys.exit(EXIT.CMDLINE)
 
     if isofactor[1] <= 1.0:
-        raise ap.ArgumentTypeError("'factor' must be greater than one")
+        print("Error: 'factor' must be greater than one")
+        sys.exit(EXIT.CMDLINE)
 
     if not signed and isofactor[0] < 0:
-        raise ap.ArgumentTypeError("Negative 'isovalue' in absolute "
-                                   "thresholding mode")
-    
+        print("Error: Negative 'isovalue' in absolute thresholding mode")
+        sys.exit(EXIT.CMDLINE)
 
-def get_parser():
+
+def _get_parser():
     """ [Docstring]
 
     """
@@ -335,7 +359,7 @@ def get_parser():
     # gzip compression level (compress)
     gp_comp.add_argument('-{0}'.format(AP.COMPRESS[0]),
                          '--{0}'.format(AP.COMPRESS),
-                         action='store', default=DEF.COMP, type=int,
+                         action='store', default=None, type=int,
                          choices=list(range(10)),
                          metavar='#',
                          help="gzip compression level for volumetric "
@@ -344,7 +368,7 @@ def get_parser():
     # gzip truncation level (compress)
     gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
                          '--{0}'.format(AP.TRUNC),
-                         action='store', default=DEF.TRUNC, type=int,
+                         action='store', default=None, type=int,
                          choices=list(range(1,16)),
                          metavar='#',
                          help="gzip truncation width for volumetric "
@@ -355,7 +379,9 @@ def get_parser():
                                 '--{0}'.format(AP.ABSMODE),
                                 action='store_true',
                                 help="absolute-value thresholding "
-                                     "mode")
+                                     "mode (default if -{0} or -{1} "
+                                     "specified".format(AP.MINMAX[0],
+                                     AP.ISOFACTOR[0]))
 
     # Signed thresholding mode (compress -- threshold mode)
     meg_threshmode.add_argument('-{0}'.format(AP.SIGNMODE[0]),
@@ -395,7 +421,7 @@ def get_parser():
     # Data block output precision (decompress)
     gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
                            '--{0}'.format(AP.PREC),
-                           action='store', default=DEF.PREC, type=int,
+                           action='store', default=None, type=int,
                            choices=list(range(16)),
                            metavar='#',
                            help="volumetric data block output "
@@ -411,7 +437,8 @@ def main():
     import os
     import sys
 
-    prs = get_parser()
+    # Retrieve the argument parser
+    prs = _get_parser()
 
     # Parse known args, convert to dict, and leave unknown args in sys.argv
     ns, args_left = prs.parse_known_args()
@@ -422,29 +449,73 @@ def main():
     path = params[AP.PATH]
     ext = os.path.splitext(path)[1]
 
+    # Check for existence
+    if not os.path.isfile(path):
+        print("File not found. Exiting...")
+        sys.exit(EXIT.FILEREAD)
+
     # Retrieve other parameters
     delsrc = params[AP.DELETE]
     comp = params[AP.COMPRESS]
     trunc = params[AP.TRUNC]
     prec = params[AP.PREC]
+    absolute = params[AP.ABSMODE]
     signed = params[AP.SIGNMODE]
+    nothresh = params[AP.NOTHRESH]
     minmax = params[AP.MINMAX]
     isofactor = params[AP.ISOFACTOR]
 
-    if minmax:
+    # Composite indicators for which types of arguments passed
+    def notNoneFalse(x):
+        return x is not None and x is not False
+
+    compargs = any(map(notNoneFalse, [comp, trunc, absolute,
+                                      signed, nothresh,
+                                      minmax, isofactor]))
+
+    decompargs = any(map(notNoneFalse, [prec]))
+
+    # Complain if nothresh specified but minmax or isofactor provided
+    if nothresh and not (minmax is None and isofactor is None):
+        print("Error: Thresholding parameter specified with --nothresh")
+        sys.exit(EXIT.CMDLINE)
+
+    # Complain if compression and decompression arguments mixed
+    if compargs and decompargs:
+        print("Error: Both compression and decompression options specified")
+        sys.exit(EXIT.CMDLINE)
+
+    # Convert and validate the thresholding inputs
+    if minmax is not None:
         minmax = np.float_(minmax)
-        validate_minmax(minmax, signed)
-    if isofactor:
+        _validate_minmax(minmax, signed)
+    if isofactor is not None:
         isofactor = np.float_(isofactor)
-        validate_isofactor(isofactor, signed)
-    
+        _validate_isofactor(isofactor, signed)
+
+    # Complain if a thresholding mode is indicated but no
+    # threshold values are provided
+    if (absolute or signed) and (minmax is None and isofactor is None):
+        print("Error: Thresholding mode specified but no values provided")
+        sys.exit(EXIT.CMDLINE)
+
     # Check file extension as indication of execution mode
     if ext == '.h5cube':
         # Decompression mode
+        if compargs:
+            print("Error: compression arguments passed to "
+                  "decompression operation")
+            sys.exit(EXIT.CMDLINE)
+
         h5_to_cube(path, delsrc=delsrc, prec=prec)
 
     elif ext in ['.cube', '.cub']:
         # Compression mode
+        if decompargs:
+            print("Error: decompression arguments passed to "
+                  "compression operation")
+            sys.exit(EXIT.CMDLINE)
+
         if minmax is not None:
             # Min/max thresholding
             cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc,
@@ -455,11 +526,14 @@ def main():
                        thresh=True, signed=signed, isofactor=isofactor)
         else:
             # No thresholding
-            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc)
+            cube_to_h5(path, thresh=False, delsrc=delsrc, comp=comp,
+                       trunc=trunc)
 
     else:
         print("File extension not recognized. Exiting...")
+        sys.exit(EXIT.CMDLINE)
 
 
 if __name__ == '__main__':
     main()
+
