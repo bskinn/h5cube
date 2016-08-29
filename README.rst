@@ -5,6 +5,9 @@ Compression/decompression command-line tool and Python package for
 Gaussian CUBE files, exploiting the capabilities of the
 `HDF5 <http://www.h5py.org/>`__ binary format via ``h5py``.
 
+Branches named with the prefix ``v.`` are volatile. The history
+there may be rewritten dramatically, without warning.
+
 Available on `PyPI <https://pypi.python.org/pypi/h5cube>`__
 (``pip install h5cube``).
 
