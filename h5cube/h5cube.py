@@ -349,7 +349,13 @@ def _get_parser():
 
     # Argument for the filename (core parser)
     prs.add_argument(AP.PATH, action='store',
-                     help="path to .(h5)cube file to be (de)compressed")
+                     help="path to file to be (de)compressed, where "
+                          "the operation to be performed is hard coded based "
+                          "on the file extension: .cub/.cube files are "
+                          "compressed to .h5cube, .h5cube files are "
+                          "decompressed to .cube, and "
+                          "the program exits with an error "
+                          "on any other extension")
 
     # Argument to delete the source file; default is to keep (core)
     prs.add_argument('-{0}'.format(AP.DELETE[0]), '--{0}'.format(AP.DELETE),
@@ -369,10 +375,12 @@ def _get_parser():
     gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
                          '--{0}'.format(AP.TRUNC),
                          action='store', default=None, type=int,
-                         choices=list(range(1,16)),
+                         choices=list(range(16)),
                          metavar='#',
-                         help="gzip truncation width for volumetric "
-                              "data (1-15, default {0})".format(DEF.TRUNC))
+                         help="h5py scale-offset filter truncation width "
+                              "for volumetric "
+                              "data (number of mantissa digits retained; "
+                              "0-15, default {0})".format(DEF.TRUNC))
 
     # Absolute thresholding mode (compress -- threshold mode)
     meg_threshmode.add_argument('-{0}'.format(AP.ABSMODE[0]),
@@ -405,7 +413,8 @@ def _get_parser():
                                 nargs=2,
                                 metavar='#',
                                 help="min and max values for "
-                                     "threshold specification")
+                                     "threshold specification (provide as "
+                                     "-m [min] [max])")
 
     # Isovalue/factor threshold specification (compress -- threshold values)
     meg_threshvals.add_argument('-{0}'.format(AP.ISOFACTOR[0]),
@@ -416,7 +425,9 @@ def _get_parser():
                                 metavar='#',
                                 help="Isovalue and multiplicative "
                                      "factor values for "
-                                     "threshold specification")
+                                     "threshold specification (e.g., "
+                                     "'-i 0.002 4' corresponds to "
+                                     "'-m 0.0005 0.008')")
 
     # Data block output precision (decompress)
     gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
@@ -500,7 +511,7 @@ def main():
         sys.exit(EXIT.CMDLINE)
 
     # Check file extension as indication of execution mode
-    if ext == '.h5cube':
+    if ext.lower() == '.h5cube':
         # Decompression mode
         if compargs:
             print("Error: compression arguments passed to "
@@ -509,7 +520,7 @@ def main():
 
         h5_to_cube(path, delsrc=delsrc, prec=prec)
 
-    elif ext in ['.cube', '.cub']:
+    elif ext.lower() in ['.cube', '.cub']:
         # Compression mode
         if decompargs:
             print("Error: decompression arguments passed to "

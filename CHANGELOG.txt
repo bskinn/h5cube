@@ -1,12 +1,19 @@
 Changelog for h5cube
 
-v0.1.post1
+v0.1.post2 (29 Aug 2016)
+================================================================================
+
+* Improve wording of commandline help messages
+* h5cube now ignores case when identifying file extensions
+
+
+v0.1.post1 (28 Aug 2016)
 ================================================================================
 
 Administrative fix (typo in setup.py)
 
 
-v0.1
+v0.1 (28 Aug 2016)
 ================================================================================
 
 Initial beta release, without documentation or a test suite. Below functionality
