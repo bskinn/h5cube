@@ -5,7 +5,7 @@ setup(
     version='0.1.post2',
     provides=['h5cube'],
     requires=['h5py (>=2.4)', 'numpy (>=1.6.1)'],
-    packages=['h5cube'],
+    packages=['h5cube', 'h5cube.test'],
     url='https://www.github.com/bskinn/h5cube',
     license='MIT License',
     author='Brian Skinn',

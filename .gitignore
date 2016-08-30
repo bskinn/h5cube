@@ -96,4 +96,7 @@ ENV/
 # Misc .bak files
 *.bak
 
+PyCharm project folder
+.idea
+
 

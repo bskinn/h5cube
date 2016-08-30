@@ -7,7 +7,7 @@
 #
 # Created:     20 Aug 2016
 # Copyright:   (c) Brian Skinn 2016
-# License:     The MIT License; see "license.txt" for full license terms
+# License:     The MIT License; see "LICENSE.txt" for full license terms
 #                   and contributor agreement.
 #
 #       http://www.github.com/bskinn/h5cube
