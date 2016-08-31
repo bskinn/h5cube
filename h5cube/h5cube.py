@@ -285,7 +285,6 @@ def _validate_minmax(minmax, signed):
 
     """
 
-    import argparse as ap
     import sys
 
     if minmax[0] >= minmax[1]:
@@ -327,7 +326,11 @@ def _get_parser():
 
     # Core parser
     prs = ap.ArgumentParser(description="Gaussian CUBE (de)compression "
-                                        "via h5py")
+                                        "via h5py",
+                            epilog="Bugs can be reported at "
+                                   "https://github.com/bskinn/h5cube/issues. "
+                                   "Documentation can be found at "
+                                   "http://h5cube.readthedocs.io.")
 
     # Compression group
     gp_comp = prs.add_argument_group(title="compression options")
