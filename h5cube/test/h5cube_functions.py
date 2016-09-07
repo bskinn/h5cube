@@ -45,6 +45,7 @@ class TestFunctionsCubeToH5(ut.TestCase):
 
     names = {'grid20'}
     sizes_noargs = {'grid20': 38180}
+    sizes_t2 = {'grid20': 28180}
 
     delta = 100 # bytes filesize match window
 
@@ -79,7 +80,8 @@ class TestFunctionsCubeToH5(ut.TestCase):
         # To ensure filesystem caching &c. can catch up
         self.shortsleep()
 
-    def test_FxnCubeToH5_NoArgs(self):
+    def basetest_FxnCubeToH5(self, sizes, **kwargs):
+        """ Core cube_to_h5 test function"""
         import os
         from h5cube import cube_to_h5
 
@@ -87,20 +89,25 @@ class TestFunctionsCubeToH5(ut.TestCase):
                    if fn.endswith('.cube')]:
             # Should only capture files present at the start of fxn execution
             try:
-                # Call with all defaults
-                cube_to_h5(os.path.join(self.scrpath, fn))
+                # Call with indicated arguments
+                cube_to_h5(os.path.join(self.scrpath, fn), **kwargs)
             except Exception:
                 self.fail("Conversion failed on '{0}'".format(fn))
 
             h5path = os.path.splitext(fn)[0] + '.h5cube'
             h5path = os.path.join(self.scrpath, h5path)
             self.assertAlmostEqual(os.path.getsize(h5path),
-                                   self.sizes_noargs[os.path.splitext(fn)[0]],
+                                   sizes[os.path.splitext(fn)[0]],
                                    delta=self.delta, # bytes +/-
                                    msg="Unexpected filesize: {0}"
                                        .format(h5path))
             self.shortsleep()
 
+    def test_FxnCubeToH5_NoArgs(self):
+        self.basetest_FxnCubeToH5(self.sizes_noargs)
+
+    def test_FxnCubeToH5_Trunc2(self):
+        self.basetest_FxnCubeToH5(self.sizes_t2, trunc=2)
 
 def suite():
     s = ut.TestSuite()
