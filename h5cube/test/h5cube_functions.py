@@ -53,6 +53,8 @@ class TestFunctionsCubeToH5(ut.TestCase):
                       'posix': {'grid20': 17156}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 18964},
                           'posix': {'grid20': 17814}}
+    sizes_si0x002f5 = {'nt': {'grid20': 16916},
+                       'posix': {'grid20': 17048}}
 
     delta = 100 # bytes filesize match window
 
@@ -139,6 +141,33 @@ class TestFunctionsCubeToH5(ut.TestCase):
                                   thresh=True, isofactor=[0.002, 10],
                                   trunc=8)
 
+    def test_FxnCubeToH5_SignedIsofactor0x002_5(self):
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_si0x002f5[os.name],
+                                  signed=True, thresh=True,
+                                  isofactor=[0.002, 5])
+
+    def test_FxnCubeToH5_NoneComp(self):
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name],
+                                  comp=None)
+
+    def test_FxnCubeToH5_NoneTrunc(self):
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name],
+                                  trunc=None)
+
+    def test_FxnCubeToH5_Clobber(self):
+        import os
+
+        # Just test the one grid20 cube, pre-writing the .h5cube to
+        #  ensure clobbering works as expected
+        fn = "grid20.h5cube"
+        with open(os.path.join(self.scrpath, fn), 'w') as f:
+            f.write('Dummy line of text\nAnother dummy line')
+
+        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name])
+
     def test_FxnCubeToH5_Delete(self):
         import os
         from h5cube import cube_to_h5
@@ -152,8 +181,7 @@ class TestFunctionsCubeToH5(ut.TestCase):
         try:
             cube_to_h5(fn, delsrc=True)
         except Exception:
-            self.fail(msg="Conversion failed on '{0}'".format(
-                      fnbase + ".cube"))
+            self.fail(msg="Conversion failed on '{0}'".format(fn))
 
         # Confirm source file was deleted
         self.assertFalse(os.path.isfile(fn))
