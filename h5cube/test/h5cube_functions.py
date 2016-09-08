@@ -43,11 +43,16 @@ class TestFunctionsCubeToH5(ut.TestCase):
     scrpath = os.path.join('h5cube', 'test', 'scratch')
     respath = os.path.join('h5cube', 'test', 'resource')
 
-    sizes_noargs = {'grid20': 38180}
-    sizes_t2 = {'grid20': 28180}
-    sizes_m1e_8m10 = {'grid20': 23685}
-    sizes_i0x002f4 = {'grid20': 17134}
-    sizes_t8_i0x002f10 = {'grid20': 18964}
+    sizes_noargs = {'nt': {'grid20': 38180},
+                    'posix': {'grid20': 38312}}
+    sizes_t2 = {'nt': {'grid20': 28180},
+                'posix': {'grid20': 28040}}
+    sizes_m1e_8m10 = {'nt': {'grid20': 23685},
+                      'posix': {'grid20': 23699}}
+    sizes_i0x002f4 = {'nt': {'grid20': 17134},
+                      'posix': {'grid20': 17156}}
+    sizes_t8_i0x002f10 = {'nt': {'grid20': 18964},
+                          'posix': {'grid20': 17814}}
 
     delta = 100 # bytes filesize match window
 
@@ -111,21 +116,26 @@ class TestFunctionsCubeToH5(ut.TestCase):
             self.shortsleep() # Ensure filesystem is done working
 
     def test_FxnCubeToH5_NoArgs(self):
-        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs)
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name])
 
     def test_FxnCubeToH5_Trunc2(self):
-        self.basetest_FxnCubeToH5(sizes=self.sizes_t2, trunc=2)
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_t2[os.name], trunc=2)
 
     def test_FxnCubeToH5_Minmax1e_8_10(self):
-        self.basetest_FxnCubeToH5(sizes=self.sizes_m1e_8m10,
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_m1e_8m10[os.name],
                                   thresh=True, minmax=[1e-8, 10])
 
     def test_FxnCubeToH5_Isofactor0x002_4(self):
-        self.basetest_FxnCubeToH5(sizes=self.sizes_i0x002f4,
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_i0x002f4[os.name],
                                   thresh=True, isofactor=[0.002, 4])
 
     def test_FxnCubeToH5_Trunc8_Isofactor0x002_10(self):
-        self.basetest_FxnCubeToH5(sizes=self.sizes_t8_i0x002f10,
+        import os
+        self.basetest_FxnCubeToH5(sizes=self.sizes_t8_i0x002f10[os.name],
                                   thresh=True, isofactor=[0.002, 10],
                                   trunc=8)
 
