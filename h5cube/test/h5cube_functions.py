@@ -37,7 +37,7 @@ class TestFunctionsMisc(ut.TestCase):
         self.assertRaises(TypeError, _ef, ValueError(), 2)
 
 
-class TestFunctionsCubeToH5(ut.TestCase):
+class SuperFunctionsTest(object):
     import os
 
     scrpath = os.path.join('h5cube', 'test', 'scratch')
@@ -93,6 +93,9 @@ class TestFunctionsCubeToH5(ut.TestCase):
 
         # To ensure filesystem caching &c. can catch up
         self.shortsleep()
+
+
+class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
 
     def basetest_FxnCubeToH5(self, sizes, **kwargs):
         """ Core cube_to_h5 test function"""
@@ -187,11 +190,91 @@ class TestFunctionsCubeToH5(ut.TestCase):
         self.assertFalse(os.path.isfile(fn))
 
 
+class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
+
+    def __init__(self, *args, **kwargs):
+        import os
+
+        # These initializations go inside __init__ because access
+        # to the superclass type 'scrpath' member is needed
+        self.ifpath = os.path.join(self.scrpath, 'grid20.cube')
+        self.ofpath = os.path.join(self.scrpath, 'mod.cube')
+
+        # Call (implicitly) the TestCase __init__
+        super().__init__(*args, **kwargs)
+
+    def copy_file_remove_line(self, lnum):
+        # Pull input contents
+        with open(self.ifpath, 'r') as f:
+            data = f.readlines()
+
+        # Write everything but the target line
+        with open(self.ofpath, 'w') as f:
+            f.writelines(data[:lnum] + data[(lnum + 1):])
+
+    def copy_file_edit_line(self, lnum, *, delchars=None, append=None):
+
+        # Pull the input contents
+        with open(self.ifpath, 'r') as f:
+            data = f.readlines()
+
+        # Remove characters if indicated
+        if delchars:
+            data[lnum] = data[lnum][:-(delchars + 1)] + '\n'
+
+        # Append if indicated (must handle newline properly)
+        if append:
+            data[lnum] = data[lnum][:-1] + str(append) + '\n'
+
+        # Write the edited file
+        with open(self.ofpath, 'w') as f:
+            f.writelines(data)
+
+    def test_FxnCubeToH5_MissingComment(self):
+        from h5cube import cube_to_h5
+
+        # Remove the first line
+        self.copy_file_remove_line(0)
+
+        # Try running the conversion; should complain in the geometry import process
+        # because it's trying to parse the first data line as the final geometry line
+        self.assertRaises(IndexError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_StubNumatomsOriginLine(self):
+        from h5cube import cube_to_h5
+
+        # Stubify the numatoms line
+        self.copy_file_edit_line(2, delchars=40)
+
+        # Try the conversion; should throw a ValueError
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_MissingOriginVal(self):
+        from h5cube import cube_to_h5
+
+        # Hack off the last origin value
+        self.copy_file_edit_line(2, delchars=12)
+
+        # Try running the conversion; should throw ValueError
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_ExtraOriginVal(self):
+        from h5cube import cube_to_h5
+        import shutil
+
+        # Add an extra value
+        self.copy_file_edit_line(2, append="  -0.03851")
+
+        # Try running the conversion; should throw ValueError
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+
 def suite():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsMisc),
-                tl.loadTestsFromTestCase(TestFunctionsCubeToH5)])
+                tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Good),
+                tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Bad)])
 
     return s
 
