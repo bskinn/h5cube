@@ -100,110 +100,131 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
     # Clobber to new file
     if os.path.isfile(h5path):
         os.remove(h5path)
-    hf = h5.File(h5path)
 
-    # Comment lines
-    hf.create_dataset(H5.COMMENT1, data=next(datalines))
-    hf.create_dataset(H5.COMMENT2, data=next(datalines))
+    # Context manager for the h5py file
+    with h5.File(h5path) as hf:
 
-    # Number of atoms and origin
-    elements = iter(next(datalines).split())
-    natoms = abs(int(next(elements)))
-    hf.create_dataset(H5.NATOMS, data=natoms)
-    hf.create_dataset(H5.ORIGIN, data=np.array([float(next(elements))
-                                             for i in range(3)]))
+        # === COMMENT# Lines ===
+        try:
+            hf.create_dataset(H5.COMMENT1, data=next(datalines))
+            hf.create_dataset(H5.COMMENT2, data=next(datalines))
+        except StopIteration as e:
+            raise ValueError("Data file incomplete") from e
 
-    # Dimensions and vectors
-    dims = []
-    for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
+        # === NATOMS and ORIGIN ===
         elements = iter(next(datalines).split())
-        hf.create_dataset(dsname, data=np.array([float(next(elements))
-                                                 for i in range(4)]))
-        dims.append(int(hf[dsname].value[0]))
 
-    # Geometry
-    # Expect NATOMS lines with atom & geom data
-    geom = np.zeros((natoms, 5))
-    for i in range(natoms):
-        elements = next(datalines).split()
-        for j in range(5):
-            geom[i, j] = elements[j]
+        # Store number of atoms
+        try:
+            natoms = abs(int(next(elements)))
+        except StopIteration as e:
+            raise ValueError("'Number of atoms' field not found") from e
+        hf.create_dataset(H5.NATOMS, data=natoms)
 
-    hf.create_dataset(H5.GEOM, data=geom)
+        # Try storing the origin, complaining if not enough data
+        try:
+            hf.create_dataset(H5.ORIGIN, data=np.array([float(next(elements))
+                                                 for i in range(3)]))
+        except StopIteration as e:
+            raise ValueError("Insufficient data for system origin") from e
 
-    # Volumetric field data
-    # Create one big iterator over a scientific notation regular
-    #  expression for the remainder of the file
+        # Complain if too much data
+        try:
+            next(elements)
+        except StopIteration:
+            pass
+        else:
+            raise ValueError("Superfluous values in 'system origin' dataset")
 
-    # Regex pattern for lines of scientific notation
-    p_scinot = re.compile("""
-        -?                           # Optional leading negative sign
-        \\d                          # Single leading digit
-        \\.                          # Decimal point
-        \\d*                         # Digits (could be none, zero precision)
-        [de]                         # Accept either 0.000d00 or 0.000e00
-        [+-]                         # Sign of the exponent
-        \\d+                         # Digits of the exponent
-        """, re.X | re.I)
+        # === SYSTEM AXES ===
+        # Dimensions and vectors
+        dims = []
+        for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
+            elements = iter(next(datalines).split())
+            hf.create_dataset(dsname, data=np.array([float(next(elements))
+                                                     for i in range(4)]))
+            dims.append(int(hf[dsname].value[0]))
 
-    # Agglomerated iterator
-    dataiter = itt.chain.from_iterable([p_scinot.finditer(l)
-                                        for l in datalines])
+        # Geometry
+        # Expect NATOMS lines with atom & geom data
+        geom = np.zeros((natoms, 5))
+        for i in range(natoms):
+            elements = next(datalines).split()
+            for j in range(5):
+                geom[i, j] = elements[j]
 
-    # Initialize the numpy objects
-    logdataarr = np.zeros(dims)
-    signsarr = np.zeros(dims)
+        hf.create_dataset(H5.GEOM, data=geom)
 
-    # Preassign the calculated minmax values if isofactored thresh
-    # is enabled
-    if thresh and isofactor is not None:
-        # Populate minmax with the isovalue/factor based
-        # threshold values
-        minmax = np.zeros((2,))
-        minmax[0] = isofactor[0] / isofactor[1]
-        minmax[1] = isofactor[0] * isofactor[1]
+        # Volumetric field data
+        # Create one big iterator over a scientific notation regular
+        #  expression for the remainder of the file
 
-    # Loop over the respective dimensions
-    for x in range(dims[0]):
-        for y in range(dims[1]):
-            for z in range(dims[2]):
-                try:
-                    val = float(next(dataiter).group(0))
-                except StopIteration as e:
-                    raise ValueError("Insufficient data in CUBE file") from e
+        # Regex pattern for lines of scientific notation
+        p_scinot = re.compile("""
+            -?                           # Optional leading negative sign
+            \\d                          # Single leading digit
+            \\.                          # Decimal point
+            \\d*                         # Digits (could be none, zero precision)
+            [de]                         # Accept either 0.000d00 or 0.000e00
+            [+-]                         # Sign of the exponent
+            \\d+                         # Digits of the exponent
+            """, re.X | re.I)
 
-                # Threshold, if indicated
-                if thresh:
-                    if signed:
-                        if val < minmax[0]:
-                            val = minmax[0]
-                        elif val > minmax[1]:
-                            val = minmax[1]
-                    else:
-                        if np.abs(val) < minmax[0]:
-                            val = np.sign(val) * minmax[0]
-                        elif np.abs(val) > minmax[1]:
-                            val = np.sign(val) * minmax[1]
+        # Agglomerated iterator
+        dataiter = itt.chain.from_iterable([p_scinot.finditer(l)
+                                            for l in datalines])
 
-                signsarr[x, y, z] = np.sign(val)
-                logdataarr[x, y, z] = np.log10(np.abs(val))
+        # Initialize the numpy objects
+        logdataarr = np.zeros(dims)
+        signsarr = np.zeros(dims)
 
-    # Ensure exhausted
-    try:
-        next(dataiter)
-    except StopIteration:
-        pass
-    else:
-        raise ValueError("CUBE file dataset not exhausted")
+        # Preassign the calculated minmax values if isofactored thresh
+        # is enabled
+        if thresh and isofactor is not None:
+            # Populate minmax with the isovalue/factor based
+            # threshold values
+            minmax = np.zeros((2,))
+            minmax[0] = isofactor[0] / isofactor[1]
+            minmax[1] = isofactor[0] * isofactor[1]
 
-    # Store the arrays, compressed
-    hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
-                      compression_opts=comp, shuffle=True, scaleoffset=trunc)
-    hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
-                      compression_opts=comp, shuffle=True)
+        # Loop over the respective dimensions
+        for x in range(dims[0]):
+            for y in range(dims[1]):
+                for z in range(dims[2]):
+                    try:
+                        val = float(next(dataiter).group(0))
+                    except StopIteration as e:
+                        raise ValueError("Insufficient data in CUBE file") from e
 
-    # Close the h5 file
-    hf.close()
+                    # Threshold, if indicated
+                    if thresh:
+                        if signed:
+                            if val < minmax[0]:
+                                val = minmax[0]
+                            elif val > minmax[1]:
+                                val = minmax[1]
+                        else:
+                            if np.abs(val) < minmax[0]:
+                                val = np.sign(val) * minmax[0]
+                            elif np.abs(val) > minmax[1]:
+                                val = np.sign(val) * minmax[1]
+
+                    signsarr[x, y, z] = np.sign(val)
+                    logdataarr[x, y, z] = np.log10(np.abs(val))
+
+        # Ensure exhausted
+        try:
+            next(dataiter)
+        except StopIteration:
+            pass
+        else:
+            raise ValueError("CUBE file dataset not exhausted")
+
+        # Store the arrays, compressed
+        hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
+                          compression_opts=comp, shuffle=True, scaleoffset=trunc)
+        hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
+                          compression_opts=comp, shuffle=True)
 
     # If indicated, delete the source file
     if delsrc:
