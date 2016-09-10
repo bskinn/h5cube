@@ -70,6 +70,18 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
+def _trynext(iterator, msg):
+    """ [Docstring] 
+
+    """
+
+    try:
+        retval = next(iterator)
+    except StopIteration as e:
+        raise ValueError("Data prematurely exhausted at '{0}'".format(msg))
+
+    return retval
+
 
 def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None):
@@ -105,30 +117,22 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
     with h5.File(h5path) as hf:
 
         # === COMMENT# Lines ===
-        try:
-            hf.create_dataset(H5.COMMENT1, data=next(datalines))
-            hf.create_dataset(H5.COMMENT2, data=next(datalines))
-        except StopIteration as e:
-            raise ValueError("Data file incomplete") from e
+        hf.create_dataset(H5.COMMENT1, data=_trynext(datalines, H5.COMMENT1))
+        hf.create_dataset(H5.COMMENT2, data=_trynext(datalines, H5.COMMENT2))
 
         # === NATOMS and ORIGIN ===
-        elements = iter(next(datalines).split())
+        elements = iter(_trynext(datalines, H5.ORIGIN).split())
 
         # Store number of atoms
-        try:
-            natoms = abs(int(next(elements)))
-        except StopIteration as e:
-            raise ValueError("'Number of atoms' field not found") from e
+        natoms = abs(int(_trynext(elements, H5.NATOMS)))
         hf.create_dataset(H5.NATOMS, data=natoms)
 
         # Try storing the origin, complaining if not enough data
-        try:
-            hf.create_dataset(H5.ORIGIN, data=np.array([float(next(elements))
-                                                 for i in range(3)]))
-        except StopIteration as e:
-            raise ValueError("Insufficient data for system origin") from e
+        hf.create_dataset(H5.ORIGIN,
+                          data=np.array([float(_trynext(elements, H5.ORIGIN))
+                                         for i in range(3)]))
 
-        # Complain if too much data
+        # Complain if too much data (DEV: REFACTOR INTO HELPER FUNCTION)
         try:
             next(elements)
         except StopIteration:
@@ -140,9 +144,10 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Dimensions and vectors
         dims = []
         for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
-            elements = iter(next(datalines).split())
-            hf.create_dataset(dsname, data=np.array([float(next(elements))
-                                                     for i in range(4)]))
+            elements = iter(_trynext(datalines, dsname).split())
+            hf.create_dataset(dsname,
+                              data=np.array([float(_trynext(elements, dsname))
+                                             for i in range(4)]))
             dims.append(int(hf[dsname].value[0]))
 
         # Geometry

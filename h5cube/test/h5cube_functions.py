@@ -260,12 +260,30 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
     def test_FxnCubeToH5_ExtraOriginVal(self):
         from h5cube import cube_to_h5
-        import shutil
 
         # Add an extra value
         self.copy_file_edit_line(2, append="  -0.03851")
 
         # Try running the conversion; should throw ValueError
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_SingleLineFile(self):
+        from h5cube import cube_to_h5
+
+        # Write the bad file
+        with open(self.ofpath, 'w') as f:
+            f.write('This is a single line in the file\n')
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_MissingXAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Hack off the last value
+        self.copy_file_edit_line(3, delchars=9)
+
+        # Conversion should fail
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
