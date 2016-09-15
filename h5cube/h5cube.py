@@ -38,8 +38,12 @@ class H5(object):
     YAXIS = 'YAXIS'
     ZAXIS = 'ZAXIS'
     GEOM = 'GEOM'
+    NUM_DSETS = 'NUM_DSETS'
+    DSET_IDS = 'DSET_IDS'
     SIGNS = 'SIGNS'
     LOGDATA = 'LOGDATA'
+
+    VAL_NOT_ORBFILE = 0
 
 # Default values
 class DEF(object):
@@ -78,9 +82,22 @@ def _trynext(iterator, msg):
     try:
         retval = next(iterator)
     except StopIteration as e:
-        raise ValueError("Data prematurely exhausted at '{0}'".format(msg))
+        raise ValueError("Data prematurely exhausted at '{0}'"
+                         .format(msg)) from e
 
     return retval
+
+def _trynonext(iterator, msg):
+    """ [Docstring]
+
+    """
+
+    try:
+        next(iterator)
+    except StopIteration:
+        pass
+    else:
+        raise ValueError("Superfluous values in '{0}' dataset".format(msg))
 
 
 def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
@@ -123,42 +140,59 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # === NATOMS and ORIGIN ===
         elements = iter(_trynext(datalines, H5.ORIGIN).split())
 
-        # Store number of atoms
-        natoms = abs(int(_trynext(elements, H5.NATOMS)))
+        # Store number of atoms; can be negative to indicate an orbital
+        # CUBE
+        natoms = int(_trynext(elements, H5.NATOMS))
         hf.create_dataset(H5.NATOMS, data=natoms)
+        is_orbfile = (np.sign(natoms) < 0)
+        natoms = abs(natoms)
 
         # Try storing the origin, complaining if not enough data
         hf.create_dataset(H5.ORIGIN,
                           data=np.array([float(_trynext(elements, H5.ORIGIN))
-                                         for i in range(3)]))
+                                         for _ in range(3)]))
 
-        # Complain if too much data (DEV: REFACTOR INTO HELPER FUNCTION)
-        try:
-            next(elements)
-        except StopIteration:
-            pass
-        else:
-            raise ValueError("Superfluous values in 'system origin' dataset")
+        # Complain if too much data
+        _trynonext(elements, "system origin")
 
         # === SYSTEM AXES ===
         # Dimensions and vectors
+        #
+        # Dimensions can be negative to indicate Angstrom units; the
+        #  data implications don't really matter, just the absolute value
+        #  needs to be used for sizing the data array.
         dims = []
         for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
             elements = iter(_trynext(datalines, dsname).split())
             hf.create_dataset(dsname,
                               data=np.array([float(_trynext(elements, dsname))
-                                             for i in range(4)]))
-            dims.append(int(hf[dsname].value[0]))
+                                             for _ in range(4)]))
+            dims.append(abs(int(hf[dsname].value[0])))
 
-        # Geometry
-        # Expect NATOMS lines with atom & geom data
+        # === GEOMETRY ===
+        # Expect |NATOMS| lines with atom & geom data
         geom = np.zeros((natoms, 5))
         for i in range(natoms):
-            elements = next(datalines).split()
+            elements = _trynext(datalines, H5.GEOM).split()
             for j in range(5):
                 geom[i, j] = elements[j]
 
         hf.create_dataset(H5.GEOM, data=geom)
+
+        # === ORBITAL INFO LINE ===
+        # (only present if natoms < 0)
+        if is_orbfile:
+            # Get iterator for the next line
+            elements = iter(_trynext(datalines, H5.DSET_IDS).split())
+
+            # Pull the number of datasets
+            num_dsets = int(_trynext(elements, H5.NUM_DSETS))
+            # RESUME HERE
+            #
+        else:
+            # Not an orbfile
+            hf.create_dataset(H5.NUM_DSETS, data=H5.VAL_NOT_ORBFILE)
+            hf.create_dataset(H5.DSET_IDS, data=np.array([]))
 
         # Volumetric field data
         # Create one big iterator over a scientific notation regular

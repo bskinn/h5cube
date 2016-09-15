@@ -43,17 +43,17 @@ class SuperFunctionsTest(object):
     scrpath = os.path.join('h5cube', 'test', 'scratch')
     respath = os.path.join('h5cube', 'test', 'resource')
 
-    sizes_noargs = {'nt': {'grid20': 38180},
+    sizes_noargs = {'nt': {'grid20': 38804},
                     'posix': {'grid20': 38312}}
-    sizes_t2 = {'nt': {'grid20': 28180},
+    sizes_t2 = {'nt': {'grid20': 28804},
                 'posix': {'grid20': 28040}}
-    sizes_m1e_8m10 = {'nt': {'grid20': 23685},
+    sizes_m1e_8m10 = {'nt': {'grid20': 24309},
                       'posix': {'grid20': 23699}}
-    sizes_i0x002f4 = {'nt': {'grid20': 17134},
+    sizes_i0x002f4 = {'nt': {'grid20': 17854},
                       'posix': {'grid20': 17156}}
-    sizes_t8_i0x002f10 = {'nt': {'grid20': 18964},
+    sizes_t8_i0x002f10 = {'nt': {'grid20': 19588},
                           'posix': {'grid20': 17814}}
-    sizes_si0x002f5 = {'nt': {'grid20': 16916},
+    sizes_si0x002f5 = {'nt': {'grid20': 17540},
                        'posix': {'grid20': 17048}}
 
     delta = 100 # bytes filesize match window
