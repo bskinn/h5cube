@@ -74,8 +74,34 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
+def _convertval(val, signed, thresh, minmax):
+    """ [Docstring]
+
+    """
+
+    import numpy as np
+
+    # Threshold, if indicated
+    if thresh:
+        if signed:
+            if val < minmax[0]:
+                val = minmax[0]
+            elif val > minmax[1]:
+                val = minmax[1]
+        else:
+            if np.abs(val) < minmax[0]:
+                val = np.sign(val) * minmax[0]
+            elif np.abs(val) > minmax[1]:
+                val = np.sign(val) * minmax[1]
+
+    if val == 0.0:
+        return [0.0, 0.0]
+    else:
+        return [np.sign(val), np.log10(np.abs(val))]
+
+
 def _trynext(iterator, msg):
-    """ [Docstring] 
+    """ [Docstring]
 
     """
 
@@ -185,10 +211,20 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             # Get iterator for the next line
             elements = iter(_trynext(datalines, H5.DSET_IDS).split())
 
-            # Pull the number of datasets
+            # Pull the number of datasets and store
             num_dsets = int(_trynext(elements, H5.NUM_DSETS))
-            # RESUME HERE
-            #
+            hf.create_dataset(H5.NUM_DSETS, data=num_dsets)
+
+            # Try to retrieve num_dsets values for the orbital indices;
+            #  complain if not enough, or if too many, and write the dataset
+            dset_ids = list(int(_trynext(elements, H5.DSET_IDS))
+                                for _ in range(num_dsets))
+            _trynonext(elements, H5.DSET_IDS)
+            hf.create_dataset(H5.DSET_IDS, data=dset_ids)
+
+            # Extend the dimensions array with the number of datasets
+            dims.append(num_dsets)
+
         else:
             # Not an orbfile
             hf.create_dataset(H5.NUM_DSETS, data=H5.VAL_NOT_ORBFILE)
@@ -209,11 +245,13 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             \\d+                         # Digits of the exponent
             """, re.X | re.I)
 
-        # Agglomerated iterator
-        dataiter = itt.chain.from_iterable([p_scinot.finditer(l)
-                                            for l in datalines])
+        # Agglomerated iterator for all remaining data in file
+        dataiter = itt.chain.from_iterable(p_scinot.finditer(l)
+                                           for l in datalines)
 
         # Initialize the numpy objects
+        # For orbital files, an extra dimension will be present, even if
+        #  there's only one dataset!
         logdataarr = np.zeros(dims)
         signsarr = np.zeros(dims)
 
@@ -227,37 +265,38 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[1] = isofactor[0] * isofactor[1]
 
         # Loop over the respective dimensions
-        for x in range(dims[0]):
-            for y in range(dims[1]):
-                for z in range(dims[2]):
-                    try:
-                        val = float(next(dataiter).group(0))
-                    except StopIteration as e:
-                        raise ValueError("Insufficient data in CUBE file") from e
+        # REFACTOR USING ITERTOOLS.PRODUCT!!!
+        if is_orbfile:
+            for x in range(dims[0]):
+                for y in range(dims[1]):
+                    for z in range(dims[2]):
+                        for d in range(dims[3]):
+                            # Retrieve the next value
+                            val = float(_trynext(dataiter, H5.LOGDATA).group(0))
 
-                    # Threshold, if indicated
-                    if thresh:
-                        if signed:
-                            if val < minmax[0]:
-                                val = minmax[0]
-                            elif val > minmax[1]:
-                                val = minmax[1]
-                        else:
-                            if np.abs(val) < minmax[0]:
-                                val = np.sign(val) * minmax[0]
-                            elif np.abs(val) > minmax[1]:
-                                val = np.sign(val) * minmax[1]
+                            # Convert to storage form
+                            st_val = _convertval(val, signed, thresh, minmax)
 
-                    signsarr[x, y, z] = np.sign(val)
-                    logdataarr[x, y, z] = np.log10(np.abs(val))
+                            # Store with four dimensions
+                            signsarr[x, y, z, d] = st_val[0]
+                            logdataarr[x, y, z, d] = st_val[1]
+
+        else:
+            for x in range(dims[0]):
+                for y in range(dims[1]):
+                    for z in range(dims[2]):
+                        # Retrieve the value
+                        val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+
+                        # Convert to storage form
+                        st_val = _convertval(val, signed, thresh, minmax)
+
+                        # Store with three dimensions
+                        signsarr[x, y, z] = st_val[0]
+                        logdataarr[x, y, z] = st_val[1]
 
         # Ensure exhausted
-        try:
-            next(dataiter)
-        except StopIteration:
-            pass
-        else:
-            raise ValueError("CUBE file dataset not exhausted")
+        _trynonext(dataiter, H5.LOGDATA)
 
         # Store the arrays, compressed
         hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
@@ -278,6 +317,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     """
 
     import h5py as h5
+    import itertools as itt
     import os
 
     # Default precision value, if no value passed on commandline
@@ -287,54 +327,81 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     # Define the header block substitution strings
     hdr_3val = "{:5d}   {: 1.6f}   {: 1.6f}   {: 1.6f}"
     hdr_4val = "{:5d}   {: 1.6f}   {: 1.6f}   {: 1.6f}   {: 1.6f}"
+    hdr_orbinfo = "   {:d}"
 
     # Define the uncompressed filename
     cubepath = os.path.splitext(h5path)[0] + '.cube'
 
     # Open the source file
-    hf = h5.File(h5path)
+    with h5.File(h5path) as hf:
 
-    # Delete any existing output file
-    if os.path.isfile(cubepath):
-        os.remove(cubepath)
+        # Delete any existing output file
+        if os.path.isfile(cubepath):
+            os.remove(cubepath)
 
-    # Open the output file for writing as a context manager
-    with open(cubepath, 'w') as f:
-        # Write the two comment lines
-        f.write(hf[H5.COMMENT1].value + '\n')
-        f.write(hf[H5.COMMENT2].value + '\n')
+        # Open the output file for writing as a context manager
+        with open(cubepath, 'w') as f:
+            # Write the two comment lines
+            f.write(hf[H5.COMMENT1].value + '\n')
+            f.write(hf[H5.COMMENT2].value + '\n')
 
-        # Write the number-of-atoms and system origin line
-        natoms = hf[H5.NATOMS].value
-        f.write(hdr_3val.format(natoms, *(hf[H5.ORIGIN].value)) + '\n')
+            # Write the number-of-atoms and system origin line
+            # Number of atoms could be negative; want to retain the negative
+            # value in the output but convert the number of atoms value to be
+            # positive.
+            natoms = hf[H5.NATOMS].value
+            f.write(hdr_3val.format(natoms, *(hf[H5.ORIGIN].value)) + '\n')
+            is_orbfile = (natoms < 0)
+            if is_orbfile:
+                natoms = abs(natoms)
 
-        # Write the three axes lines
-        dims = []
-        for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
-            ds = hf[dsname].value
-            f.write(hdr_3val.format(int(ds[0]), *ds[1:]) + '\n')
-            dims.append(int(ds[0]))
+            # Write the three axes lines
+            dims = []
+            for dsname in [H5.XAXIS, H5.YAXIS, H5.ZAXIS]:
+                ds = hf[dsname].value
+                f.write(hdr_3val.format(int(ds[0]), *ds[1:]) + '\n')
+                dims.append(abs(int(ds[0]))) # values could be negative
 
-        # Write the geometry
-        geom = hf[H5.GEOM].value
-        for i in range(natoms):
-            f.write(hdr_4val.format(int(geom[i,0]), *geom[i,1:]) + '\n')
+            # Write the geometry
+            geom = hf[H5.GEOM].value
+            for i in range(natoms):
+                f.write(hdr_4val.format(int(geom[i,0]), *geom[i,1:]) + '\n')
 
-        # Write the data blocks
-        signs = hf[H5.SIGNS].value
-        logvals = hf[H5.LOGDATA].value
-        for x in range(dims[0]):
-            for y in range(dims[1]):
-                for z in range(dims[2]):
-                    f.write(_exp_format(signs[x, y, z] *
-                                       10.**logvals[x, y, z], prec))
-                    if z % 6 == 5:
-                        f.write('\n')
+            # If an orbital file, write the orbital info line and append the
+            # number of datasets to the 'dims' variable
+            if is_orbfile:
+                # Store the dataset dimension
+                dims.append(int(hf[H5.NUM_DSETS].value))
 
+                # Write the dataset dimension to the output
+                f.write(hdr_orbinfo.format(dims[3]))
+
+                # Write all of the orbital dataset IDs to output. Have to have
+                # the wrapping 'list' call since the write actually depends on
+                # the materialization of the iterator.
+                list(map(lambda s: f.write(hdr_orbinfo.format(int(s))),
+                         iter(hf[H5.DSET_IDS].value)))
+
+                # Cap with EOL
                 f.write('\n')
 
-    # Close the h5 file
-    hf.close()
+            # Write the data blocks
+            # Pull them from the .h5cube file first
+            signs = hf[H5.SIGNS].value
+            logvals = hf[H5.LOGDATA].value
+
+            # Can just run a combinatorial iterator over the dimensions
+            # of the dataset
+            for t in itt.product(*map(range, dims)):
+                f.write(_exp_format(signs[t] * 10.**logvals[t], prec))
+
+                # Newline to wrap at a max of six values per line, or if the
+                # the last index is at the end of its dimension
+                if t[-1] % 6 == 5 or t[-1] == dims[-1] - 1:
+                    f.write('\n')
+
+            # Always newlines at end
+            f.write('\n\n')
 
     # If indicated, delete the source file
     if delsrc:
