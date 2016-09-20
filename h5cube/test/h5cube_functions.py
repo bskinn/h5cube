@@ -46,39 +46,39 @@ class SuperFunctionsTest(object):
     sizes_noargs = {'nt': {'grid20': 38804,
                            'grid25mo': 60829,
                            'grid20mo6-8': 90973},
-                    'posix': {'grid20': 38312,
-                              'grid25mo': 0,
-                              'grid20mo6-8': 0}}
+                    'posix': {'grid20': 38856,
+                              'grid25mo': 60641,
+                              'grid20mo6-8': 90810}}
     sizes_t2 = {'nt': {'grid20': 28804,
                        'grid25mo': 41168,
                        'grid20mo6-8': 57725},
-                'posix': {'grid20': 28040,
-                          'grid25mo': 0,
-                          'grid20mo6-8': 0}}
+                'posix': {'grid20': 28584,
+                          'grid25mo': 41037,
+                          'grid20mo6-8': 57568}}
     sizes_m1e_8m10 = {'nt': {'grid20': 24309,
                              'grid25mo': 52968,
                              'grid20mo6-8': 82420},
-                      'posix': {'grid20': 23699,
-                                'grid25mo': 0,
-                                'grid20mo6-8': 0}}
+                      'posix': {'grid20': 24243,
+                                'grid25mo': 52798,
+                                'grid20mo6-8': 82269}}
     sizes_i0x002f4 = {'nt': {'grid20': 17854,
                              'grid25mo': 26982,
                              'grid20mo6-8': 38628},
-                      'posix': {'grid20': 17156,
-                                'grid25mo': 0,
-                                'grid20mo6-8': 0}}
+                      'posix': {'grid20': 17700,
+                                'grid25mo': 26813,
+                                'grid20mo6-8': 38458}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19588,
                                  'grid25mo': 32728,
                                  'grid20mo6-8': 50220},
-                          'posix': {'grid20': 17814,
-                                    'grid25mo': 0,
-                                    'grid20mo6-8': 0}}
+                          'posix': {'grid20': 18358,
+                                    'grid25mo': 32573,
+                                    'grid20mo6-8': 50049}}
     sizes_si0x002f5 = {'nt': {'grid20': 17540,
                               'grid25mo': 22707,
                               'grid20mo6-8': 28767},
-                       'posix': {'grid20': 17048,
-                                 'grid25mo': 0,
-                                 'grid20mo6-8': 0}}
+                       'posix': {'grid20': 17592,
+                                 'grid25mo': 22581,
+                                 'grid20mo6-8': 28594}}
 
     delta = 100 # bytes filesize match window
 
