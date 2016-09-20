@@ -170,7 +170,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # CUBE
         natoms = int(_trynext(elements, H5.NATOMS))
         hf.create_dataset(H5.NATOMS, data=natoms)
-        is_orbfile = (np.sign(natoms) < 0)
+        is_orbfile = (natoms < 0)
         natoms = abs(natoms)
 
         # Try storing the origin, complaining if not enough data
@@ -264,36 +264,17 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[0] = isofactor[0] / isofactor[1]
             minmax[1] = isofactor[0] * isofactor[1]
 
-        # Loop over the respective dimensions
-        # REFACTOR USING ITERTOOLS.PRODUCT!!!
-        if is_orbfile:
-            for x in range(dims[0]):
-                for y in range(dims[1]):
-                    for z in range(dims[2]):
-                        for d in range(dims[3]):
-                            # Retrieve the next value
-                            val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+        # Loop over the respective dimensions to store the dataset
+        for t in itt.product(*map(range, dims)):
+            # Retrieve the next value
+            val = float(_trynext(dataiter, H5.LOGDATA).group(0))
 
-                            # Convert to storage form
-                            st_val = _convertval(val, signed, thresh, minmax)
+            # Convert to storage data values
+            st_val = _convertval(val, signed, thresh, minmax)
 
-                            # Store with four dimensions
-                            signsarr[x, y, z, d] = st_val[0]
-                            logdataarr[x, y, z, d] = st_val[1]
-
-        else:
-            for x in range(dims[0]):
-                for y in range(dims[1]):
-                    for z in range(dims[2]):
-                        # Retrieve the value
-                        val = float(_trynext(dataiter, H5.LOGDATA).group(0))
-
-                        # Convert to storage form
-                        st_val = _convertval(val, signed, thresh, minmax)
-
-                        # Store with three dimensions
-                        signsarr[x, y, z] = st_val[0]
-                        logdataarr[x, y, z] = st_val[1]
+            # Store in the pre-sized data containers
+            signsarr[t] = st_val[0]
+            logdataarr[t] = st_val[1]
 
         # Ensure exhausted
         _trynonext(dataiter, H5.LOGDATA)
@@ -374,10 +355,10 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
                 dims.append(int(hf[H5.NUM_DSETS].value))
 
                 # Write the dataset dimension to the output
-                f.write(hdr_orbinfo.format(dims[3]))
+                f.write(hdr_orbinfo.format(dims[-1]))
 
                 # Write all of the orbital dataset IDs to output. Have to have
-                # the wrapping 'list' call since the write actually depends on
+                # the wrapping 'list' call since the write depends on
                 # the materialization of the iterator.
                 list(map(lambda s: f.write(hdr_orbinfo.format(int(s))),
                          iter(hf[H5.DSET_IDS].value)))
@@ -392,12 +373,16 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
 
             # Can just run a combinatorial iterator over the dimensions
             # of the dataset
-            for t in itt.product(*map(range, dims)):
-                f.write(_exp_format(signs[t] * 10.**logvals[t], prec))
+            for i, t in enumerate(itt.product(*map(range, dims))):
+                # f.write(_exp_format(hf[H5.SIGNS].value[t] *
+                #                     10.**hf[H5.LOGDATA].value[t], prec))
+                f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
 
-                # Newline to wrap at a max of six values per line, or if the
-                # the last index is at the end of its dimension
-                if t[-1] % 6 == 5 or t[-1] == dims[-1] - 1:
+                # Newline to wrap at a max of six values per line, or if at
+                # the last entry of a z-iteration and at the last dataset,
+                # for orbital files.
+                if i % 6 == 5 or (t[2] == dims[2] - 1 and
+                                  t[-1] == dims[-1] -1):
                     f.write('\n')
 
             # Always newlines at end
