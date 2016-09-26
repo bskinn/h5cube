@@ -24,6 +24,10 @@ class AP(object):
     ALL = 'all'
     CMDLINE = 'cmdline'
     FUNCTIONS = 'functions'
+    FUNCTIONS_MISC = 'functions_misc'
+    FUNCTIONS_GOODH5 = 'functions_goodh5'
+    FUNCTIONS_BADH5 = 'functions_badh5'
+    FUNCTIONS_CYCLEDH5 = 'functions_cycledh5'
 
     PFX = "--{0}"
 
@@ -35,22 +39,38 @@ def get_parser():
     prs = argparse.ArgumentParser(description="Run tests for h5cube")
 
     # Create test groups
-    gp_global = prs.add_argument_group(title="Test selection options")
+    gp_global = prs.add_argument_group(title="Global test options")
+    gp_fxns = prs.add_argument_group(title="Tests for API functions")
+    gp_cmdline = prs.add_argument_group(title="Tests for commandline parsing")
 
     # Verbosity argument
     prs.add_argument('-v', action='store_true',
                      help="Show verbose output")
 
-    # All tests in a single group for now; project isn't big yet
+    # Groups without subgroups
     gp_global.add_argument(AP.PFX.format(AP.ALL),
                      action='store_true',
                      help="Run all tests (overrides any other selections)")
-    gp_global.add_argument(AP.PFX.format(AP.CMDLINE),
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE),
                      action='store_true',
                      help="Run tests of commandline interface")
-    gp_global.add_argument(AP.PFX.format(AP.FUNCTIONS),
+
+    # API function tests
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS),
                      action='store_true',
-                     help="Run tests of h5cube internal functionality")
+                     help="Run all API function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_GOODH5),
+                         action='store_true',
+                         help="Run 'no-error' API function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_BADH5),
+                         action='store_true',
+                         help="Run 'error-expected' API function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CYCLEDH5),
+                         action='store_true',
+                         help="Run multi-cycled API function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_MISC),
+                         action='store_true',
+                         help="Run tests of miscellaneous API functions")
 
     # Return the parser
     return prs
@@ -73,12 +93,26 @@ def main():
     # Create the empty test suite
     ts = ut.TestSuite()
 
-    # All tests in one group for now
+    # All commandline tests in one group for now
     if any(params[k] for k in [AP.ALL, AP.CMDLINE]):
         ts.addTest(h5cube.test.h5cube_cmdline.suite())
 
-    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS]):
-        ts.addTest(h5cube.test.h5cube_functions.suite())
+    # API function tests split into groups
+    # Expected-good
+    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_GOODH5]):
+        ts.addTest(h5cube.test.h5cube_functions.suite_goodh5())
+
+    # Expected-bad
+    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_BADH5]):
+        ts.addTest(h5cube.test.h5cube_functions.suite_badh5())
+
+    # Cycled conversion tests
+    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLEDH5]):
+        ts.addTest(h5cube.test.h5cube_functions.suite_cycledh5())
+
+    # Misc API tests
+    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_MISC]):
+        ts.addTest(h5cube.test.h5cube_functions.suite_misc())
 
     # Create the test runner and execute
     ttr = ut.TextTestRunner(buffer=True,

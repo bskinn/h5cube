@@ -108,7 +108,7 @@ def _trynext(iterator, msg):
     try:
         retval = next(iterator)
     except StopIteration as e:
-        raise ValueError("Data prematurely exhausted at '{0}'"
+        raise ValueError("Data prematurely exhausted in '{0}' dataset"
                          .format(msg)) from e
 
     return retval
@@ -194,14 +194,16 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                               data=np.array([float(_trynext(elements, dsname))
                                              for _ in range(4)]))
             dims.append(abs(int(hf[dsname].value[0])))
+            _trynonext(elements, dsname)
 
         # === GEOMETRY ===
         # Expect |NATOMS| lines with atom & geom data
         geom = np.zeros((natoms, 5))
         for i in range(natoms):
-            elements = _trynext(datalines, H5.GEOM).split()
+            elements = iter(_trynext(datalines, H5.GEOM).split())
             for j in range(5):
-                geom[i, j] = elements[j]
+                geom[i, j] = _trynext(elements, H5.GEOM)
+            _trynonext(elements, H5.GEOM)
 
         hf.create_dataset(H5.GEOM, data=geom)
 

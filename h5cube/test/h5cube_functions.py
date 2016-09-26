@@ -221,7 +221,7 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
         # These initializations go inside __init__ because access
         # to the superclass type 'scrpath' member is needed
-        self.ifpath = os.path.join(self.scrpath, 'grid20.cube')
+        self.ifpath = os.path.join(self.scrpath, 'grid20mo6-8.cube')
         self.ofpath = os.path.join(self.scrpath, 'mod.cube')
 
         # Call (implicitly) the TestCase __init__
@@ -260,9 +260,10 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         # Remove the first line
         self.copy_file_remove_line(0)
 
-        # Try running the conversion; should complain in the geometry import process
-        # because it's trying to parse the first data line as the final geometry line
-        self.assertRaises(IndexError, cube_to_h5, self.ofpath)
+        # Try running the conversion; should complain in the z-axis
+        # import process because it's trying to parse the first geometry
+        # line as the z-axis line
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
     def test_FxnCubeToH5_StubNumatomsOriginLine(self):
         from h5cube import cube_to_h5
@@ -311,16 +312,182 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
-def suite():
+    def test_FxnCubeToH5_MissingYAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Hack off the last value
+        self.copy_file_edit_line(4, delchars=9)
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+
+    def test_FxnCubeToH5_MissingZAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Hack off the last value
+        self.copy_file_edit_line(5, delchars=9)
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_ExtraXAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(3, append="  0.30388")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+
+    def test_FxnCubeToH5_ExtraYAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(4, append="  0.2627688")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_ExtraZAXISVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(5, append="  0.54886")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_MissingGeomVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(8, delchars=9)
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+
+    def test_FxnCubeToH5_ExtraGeomVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(8, append="  -0.398734")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_MissingOrbVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(13, delchars=2)
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_ExtraOrbVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(13, append="  12")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_MissingDataVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(18, delchars=13)
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+    def test_FxnCubeToH5_ExtraDataVal(self):
+        from h5cube import cube_to_h5
+
+        # Append a new value to the last value
+        self.copy_file_edit_line(22, append="  -4.2234E-13")
+
+        # Conversion should fail
+        self.assertRaises(ValueError, cube_to_h5, self.ofpath)
+
+
+class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
+
+    def test_FxnBoth_2xCycle(self):
+        from h5cube import cube_to_h5 as cth
+        from h5cube import h5_to_cube as htc
+        import os
+        import shutil
+
+        # Temp filenames
+        fn_cyc = 'cyc'
+
+        # Helper scratch path function
+        def scrfn(fn):
+            import os
+
+            return os.path.join(self.scrpath, fn)
+
+        # Helper runner function
+        def cycrun(self, fxn, ext, fn, msg):
+            try:
+                fxn(scrfn(fn_cyc + ext))
+            except ValueError as e:
+                self.fail(msg="Unexpected exception on {0} ({1}): {2}"
+                          .format(msg, fn, str(e)))
+
+        # Test all of the files
+        for fn in os.listdir(self.scrpath):
+            # Copy the source file to the modified name
+            shutil.copy(scrfn(fn), scrfn(fn_cyc + '.cube'))
+
+            # Attempt first compression on the file, default options
+            cycrun(self, cth, '.cube', fn, 'initial compression')
+
+            # First decompression
+            cycrun(self, htc, '.h5cube', fn, 'initial decompression')
+
+            # Recompression
+            cycrun(self, cth, '.cube', fn, 'repeat compression')
+
+            # Re-decompression
+            cycrun(self, htc, '.h5cube', fn, 'repeat decompression')
+
+
+def suite_misc():
     s = ut.TestSuite()
     tl = ut.TestLoader()
-    s.addTests([tl.loadTestsFromTestCase(TestFunctionsMisc),
-                tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Good),
-                tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Bad)])
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsMisc)])
 
     return s
 
 
+def suite_goodh5():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Good)])
+
+    return s
+
+
+def suite_badh5():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Bad)])
+
+    return s
+
+
+def suite_cycledh5():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsCycled)])
+
+    return s
 
 
 if __name__ == '__main__':  # pragma: no cover
