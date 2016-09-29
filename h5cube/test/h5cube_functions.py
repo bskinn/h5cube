@@ -224,7 +224,8 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.ifpath = os.path.join(self.scrpath, 'grid20mo6-8.cube')
         self.ofpath = os.path.join(self.scrpath, 'mod.cube')
 
-        # Call (implicitly) the TestCase __init__
+        # Call the TestCase __init__ (skips SuperFunctionsTest since no
+        #  __init__ defined there)
         super().__init__(*args, **kwargs)
 
     def copy_file_remove_line(self, lnum):
@@ -415,47 +416,151 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
-class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
+class SuperCycledAndDataCheck(object):
+    # scrpath and fail should work ok late-bound. Bad practice in general!\
 
-    def test_FxnBoth_2xCycle(self):
+    # Helper scratch path/filename function
+    @classmethod
+    def scrfn(cls, fn):
+        import os
+        return os.path.join(cls.scrpath, fn)
+
+    # Helper runner function
+    @classmethod
+    def runfxn(cls, fxn, ext, work_fn, orig_fn, msg, failobj=None):
+        try:
+            fxn(cls.scrfn(work_fn + ext))
+        except ValueError as e:
+            errmsg = "Unexpected exception on {0} ({1}): {2}".format(msg,
+                                                                orig_fn, str(e))
+            try:
+                failobj.fail(msg=errmsg)
+            except AttributeError:
+                raise ValueError(errmsg) from e
+
+
+class TestFunctionsCycled(SuperFunctionsTest, SuperCycledAndDataCheck,
+                          ut.TestCase):
+
+    def test_FxnCycled_2xCycle(self):
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
         import os
         import shutil
 
-        # Temp filenames
+        # Temp filename
         fn_cyc = 'cyc'
 
-        # Helper scratch path function
-        def scrfn(fn):
-            import os
-
-            return os.path.join(self.scrpath, fn)
-
-        # Helper runner function
-        def cycrun(self, fxn, ext, fn, msg):
-            try:
-                fxn(scrfn(fn_cyc + ext))
-            except ValueError as e:
-                self.fail(msg="Unexpected exception on {0} ({1}): {2}"
-                          .format(msg, fn, str(e)))
-
         # Test all of the files
-        for fn in os.listdir(self.scrpath):
+        for fn in [s for s in os.listdir(self.scrpath) if s.endswith('.cube')]:
             # Copy the source file to the modified name
-            shutil.copy(scrfn(fn), scrfn(fn_cyc + '.cube'))
+            shutil.copy(self.scrfn(fn), self.scrfn(fn_cyc + '.cube'))
 
             # Attempt first compression on the file, default options
-            cycrun(self, cth, '.cube', fn, 'initial compression')
+            self.runfxn(cth, '.cube', fn_cyc, fn, 'initial compression',
+                        failobj=self)
 
             # First decompression
-            cycrun(self, htc, '.h5cube', fn, 'initial decompression')
+            self.runfxn(htc, '.h5cube', fn_cyc, fn, 'initial decompression',
+                        failobj=self)
 
             # Recompression
-            cycrun(self, cth, '.cube', fn, 'repeat compression')
+            self.runfxn(cth, '.cube', fn_cyc, fn, 'repeat compression',
+                        failobj=self)
 
             # Re-decompression
-            cycrun(self, htc, '.h5cube', fn, 'repeat decompression')
+            self.runfxn(htc, '.h5cube', fn_cyc, fn, 'repeat decompression',
+                        failobj=self)
+
+
+class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
+                             ut.TestCase):
+    from h5cube import H5
+
+    fn1 = 'file1'
+    fn2 = 'file2'
+
+    @classmethod
+    def setUpClass(cls):
+        from h5cube import cube_to_h5 as cth
+        from h5cube import h5_to_cube as htc
+        import os
+
+        basefn = 'grid20mo6-8'
+
+        # Superclass setUpClass method (at time of writing, just setting the
+        # longMessage = True)
+        super().setUpClass()
+
+        # Hack in the parent setUp method to copy the files &c. only once,
+        #  before all tests run
+        super().setUp(cls)
+
+        # Rename the multi-MO CUBE to first temp name
+        os.rename(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
+
+        # First compression
+        cls.runfxn(cth, '.cube', cls.fn1, basefn, 'first compression')
+
+        # First decompression
+        cls.runfxn(htc, '.h5cube', cls.fn1, basefn, 'first decompression')
+
+        # Rename the decompressed .cube to fn2
+        os.rename(cls.scrfn(cls.fn1 + '.cube'), cls.scrfn(cls.fn2 + '.cube'))
+
+        # Recompress
+        cls.runfxn(cth, '.cube', cls.fn2, basefn, 'second compression')
+
+    def setUp(self):
+        # Override the parent setUp method to prevent it from running
+        # again and likely making a hash of the scratch directory
+        pass
+
+    def tearDown(self):
+        # Intercept. Don't want the scratch dir scrubbed after each test
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        # Want to run the parent tearDown at the end of running all of the
+        # tests here
+        super().tearDown(cls)
+
+    def do_h5py_test(self, key):
+        import h5py as h5
+        with h5.File(self.scrfn(self.fn1 + '.h5cube')) as hf1:
+            with h5.File(self.scrfn(self.fn2 + '.h5cube')) as hf2:
+                self.assertIsNotNone(hf1.get(key))
+                try:
+                    # If it has a shape member, assume it's an ndarray
+                    hf1.get(key).value.shape
+                except AttributeError:
+                    # Probably not ndarray, just compare values
+                    self.assertEqual(hf1.get(key).value, hf2.get(key).value)
+                else:
+                    # Probably is ndarray. Want same shape and identical values
+                    self.assertEqual(hf1.get(key).value.shape,
+                                     hf2.get(key).value.shape)
+                    self.assertTrue((hf1.get(key).value == hf2.get(key).value
+                                     ).all())
+
+    def test_FxnDataCheck_COMMENT1_Check(self):
+        self.do_h5py_test(self.H5.COMMENT1)
+
+    def test_FxnDataCheck_COMMENT2_Check(self):
+        self.do_h5py_test(self.H5.COMMENT2)
+
+    def test_FxnDataCheck_NUM_DSETS_Check(self):
+        self.do_h5py_test(self.H5.NUM_DSETS)
+
+    def test_FxnDataCheck_NATOMS_Check(self):
+        self.do_h5py_test(self.H5.NATOMS)
+
+    def test_FxnDataCheck_DSET_IDS_Check(self):
+        self.do_h5py_test(self.H5.DSET_IDS)
+
+    def test_FxnDataCheck_GEOM_Check(self):
+        self.do_h5py_test(self.H5.GEOM)
 
 
 def suite_misc():
@@ -486,6 +591,14 @@ def suite_cycledh5():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsCycled)])
+
+    return s
+
+
+def suite_datacheckh5():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsDataCheck)])
 
     return s
 

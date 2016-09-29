@@ -27,6 +27,7 @@ class AP(object):
     FUNCTIONS_MISC = 'functions_misc'
     FUNCTIONS_GOODH5 = 'functions_goodh5'
     FUNCTIONS_BADH5 = 'functions_badh5'
+    FUNCTIONS_DATAH5 = 'functions_datah5'
     FUNCTIONS_CYCLEDH5 = 'functions_cycledh5'
 
     PFX = "--{0}"
@@ -68,6 +69,9 @@ def get_parser():
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CYCLEDH5),
                          action='store_true',
                          help="Run multi-cycled API function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DATAH5),
+                         action='store_true',
+                         help="Run API function data validation tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_MISC),
                          action='store_true',
                          help="Run tests of miscellaneous API functions")
@@ -106,7 +110,11 @@ def main():
     if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_BADH5]):
         ts.addTest(h5cube.test.h5cube_functions.suite_badh5())
 
-    # Cycled conversion tests
+    # Data validation tests
+    if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DATAH5]):
+        ts.addTest(h5cube.test.h5cube_functions.suite_datacheckh5())
+
+    # Cycled execution tests
     if any(params[k] for k in [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLEDH5]):
         ts.addTest(h5cube.test.h5cube_functions.suite_cycledh5())
 
