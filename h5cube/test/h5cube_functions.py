@@ -427,15 +427,20 @@ class SuperCycledAndDataCheck(object):
 
     # Helper runner function
     @classmethod
-    def runfxn(cls, fxn, ext, work_fn, orig_fn, msg, failobj=None):
+    def runfxn(cls, fxn, ext, work_fn, orig_fn, msg, failobj=None, kwargs={}):
         try:
-            fxn(cls.scrfn(work_fn + ext))
+            # Call indicated function with indicated work input file and
+            # any kwargs passed
+            fxn(cls.scrfn(work_fn + ext), **kwargs)
         except ValueError as e:
+            # Compose the error message
             errmsg = "Unexpected exception on {0} ({1}): {2}".format(msg,
                                                                 orig_fn, str(e))
             try:
+                # If a valid fail object is passed, call fail on it
                 failobj.fail(msg=errmsg)
             except AttributeError:
+                # Otherwise, just raise chained error
                 raise ValueError(errmsg) from e
 
 
@@ -477,8 +482,12 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
                              ut.TestCase):
     from h5cube import H5
 
+    # Working filenames
     fn1 = 'file1'
     fn2 = 'file2'
+
+    # Log tolerance sought for LOGDATA match
+    logtol = -9
 
     @classmethod
     def setUpClass(cls):
@@ -500,16 +509,19 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
         os.rename(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
 
         # First compression
-        cls.runfxn(cth, '.cube', cls.fn1, basefn, 'first compression')
+        cls.runfxn(cth, '.cube', cls.fn1, basefn, 'first compression',
+                   kwargs={'trunc': -cls.logtol})
 
         # First decompression
-        cls.runfxn(htc, '.h5cube', cls.fn1, basefn, 'first decompression')
+        cls.runfxn(htc, '.h5cube', cls.fn1, basefn, 'first decompression',
+                   kwargs={'prec': -cls.logtol})
 
         # Rename the decompressed .cube to fn2
         os.rename(cls.scrfn(cls.fn1 + '.cube'), cls.scrfn(cls.fn2 + '.cube'))
 
         # Recompress
-        cls.runfxn(cth, '.cube', cls.fn2, basefn, 'second compression')
+        cls.runfxn(cth, '.cube', cls.fn2, basefn, 'second compression',
+                   kwargs={'trunc': -cls.logtol})
 
     def setUp(self):
         # Override the parent setUp method to prevent it from running
@@ -528,9 +540,17 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
 
     def do_h5py_test(self, key):
         import h5py as h5
+        from h5cube import H5
+        import numpy as np
+
+        # Open the .h5cubes in a crash-safe way
         with h5.File(self.scrfn(self.fn1 + '.h5cube')) as hf1:
             with h5.File(self.scrfn(self.fn2 + '.h5cube')) as hf2:
+                # First, ensure the key of interest is present
                 self.assertIsNotNone(hf1.get(key))
+
+                # try-except form of 'shape' membership testing, looking for
+                # simple __eq__ comparables versus ndarrays
                 try:
                     # If it has a shape member, assume it's an ndarray
                     hf1.get(key).value.shape
@@ -541,8 +561,16 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
                     # Probably is ndarray. Want same shape and identical values
                     self.assertEqual(hf1.get(key).value.shape,
                                      hf2.get(key).value.shape)
-                    self.assertTrue((hf1.get(key).value == hf2.get(key).value
-                                     ).all())
+
+                    # LOGDATA doesn't always compare strictly equal.
+                    if key == H5.LOGDATA:
+                        self.assertTrue(np.isclose(hf1.get(key).value,
+                                                   hf2.get(key).value,
+                                                   atol=10. ** self.logtol)
+                                        .all())
+                    else:
+                        self.assertTrue((hf1.get(key).value ==
+                                         hf2.get(key).value).all())
 
     def test_FxnDataCheck_COMMENT1_Check(self):
         self.do_h5py_test(self.H5.COMMENT1)
@@ -561,6 +589,24 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
 
     def test_FxnDataCheck_GEOM_Check(self):
         self.do_h5py_test(self.H5.GEOM)
+
+    def test_FxnDataCheck_ORIGIN_Check(self):
+        self.do_h5py_test(self.H5.ORIGIN)
+
+    def test_FxnDataCheck_XAXIS_Check(self):
+        self.do_h5py_test(self.H5.XAXIS)
+
+    def test_FxnDataCheck_YAXIS_Check(self):
+        self.do_h5py_test(self.H5.YAXIS)
+
+    def test_FxnDataCheck_ZAXIS_Check(self):
+        self.do_h5py_test(self.H5.ZAXIS)
+
+    def test_FxnDataCheck_SIGNS_Check(self):
+        self.do_h5py_test(self.H5.SIGNS)
+
+    def test_FxnDataCheck_LOGDATA_Check(self):
+        self.do_h5py_test(self.H5.LOGDATA)
 
 
 def suite_misc():
