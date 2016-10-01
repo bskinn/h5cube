@@ -80,7 +80,7 @@ class SuperFunctionsTest(object):
                                  'grid25mo': 22581,
                                  'grid20mo6-8': 28594}}
 
-    delta = 100 # bytes filesize match window
+    fsize_delta = 100 # bytes filesize match window
 
     @staticmethod
     def shortsleep():
@@ -88,38 +88,76 @@ class SuperFunctionsTest(object):
         sleep(0.1)
 
     @classmethod
-    def setUpClass(cls):
+    def ensure_scratch_dir(cls):
         import os
-
-        cls.longMessage = True
 
         # Ensure scratch directory exists
         if not os.path.isdir(cls.scrpath):
             os.mkdir(cls.scrpath)
 
-    def setUp(self):
+    @classmethod
+    def copy_scratch(cls):
         import os
         import shutil
 
-        for fn in [fn for fn in os.listdir(self.respath)
-                  if fn.endswith('.cube')]:
-            shutil.copy(os.path.join(self.respath, fn),
-                        os.path.join(self.scrpath, fn))
+        for fn in [fn for fn in os.listdir(cls.respath)
+                   if fn.endswith('.cube')]:
+            shutil.copy(os.path.join(cls.respath, fn),
+                        os.path.join(cls.scrpath, fn))
 
         # To ensure filesystem caching &c. can catch up
-        self.shortsleep()
+        cls.shortsleep()
 
-    def tearDown(self):
+    @classmethod
+    def clear_scratch(cls):
         import os
 
-        for fn in os.listdir(self.scrpath):
-            os.remove(os.path.join(self.scrpath, fn))
+        for fn in os.listdir(cls.scrpath):
+            os.remove(os.path.join(cls.scrpath, fn))
 
         # To ensure filesystem caching &c. can catch up
-        self.shortsleep()
+        cls.shortsleep()
+
+    # Helper runner function
+    @classmethod
+    def runfxn(cls, fxn, ext, work_fn, orig_fn, msg, failobj=None, kwargs={}):
+        # scrpath and fail should work ok late-bound. Bad practice in general!
+        try:
+            # Call indicated function with indicated work input file and
+            # any kwargs passed
+            fxn(cls.scrfn(work_fn + ext), **kwargs)
+
+        except ValueError as e:
+            # Compose the error message
+            errmsg = "Unexpected exception on {0} ({1}): {2}".format(msg,
+                                                                     orig_fn,
+                                                                     str(e))
+            try:
+                # If a valid fail object is passed, call fail on it
+                failobj.fail(msg=errmsg)
+            except AttributeError:
+                # Otherwise, just raise chained error
+                raise ValueError(errmsg) from e
+
+    # Helper scratch path/filename function
+    @classmethod
+    def scrfn(cls, fn):
+        import os
+        return os.path.join(cls.scrpath, fn)
 
 
 class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
+
+    def setUp(self):
+        self.copy_scratch()
+
+    def tearDown(self):
+        self.clear_scratch()
 
     def basetest_FxnCubeToH5(self, sizes, **kwargs):
         """ Core cube_to_h5 test function"""
@@ -130,7 +168,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
                    if fn.endswith('.cube')]:
             # Should only capture files present at the start of fxn execution
             try:
-                # Call with indicated arguments
+                # Call with indicated extra arguments
                 cube_to_h5(os.path.join(self.scrpath, fn), **kwargs)
             except Exception:
                 self.fail(msg="Conversion failed on '{0}'".format(fn))
@@ -139,9 +177,9 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
             h5path = os.path.join(self.scrpath, h5path)
             self.assertAlmostEqual(os.path.getsize(h5path),
                                    sizes[os.path.splitext(fn)[0]],
-                                   delta=self.delta, # bytes +/-
+                                   delta=self.fsize_delta,  # bytes +/-
                                    msg="Unexpected filesize: {0}"
-                                       .format(h5path))
+                                   .format(h5path))
             self.shortsleep() # Ensure filesystem is done working
 
     def test_FxnCubeToH5_NoArgs(self):
@@ -216,17 +254,22 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
 
 class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
-    def __init__(self, *args, **kwargs):
+    @classmethod
+    def setUpClass(cls):
         import os
 
-        # These initializations go inside __init__ because access
-        # to the superclass type 'scrpath' member is needed
-        self.ifpath = os.path.join(self.scrpath, 'grid20mo6-8.cube')
-        self.ofpath = os.path.join(self.scrpath, 'mod.cube')
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
 
-        # Call the TestCase __init__ (skips SuperFunctionsTest since no
-        #  __init__ defined there)
-        super().__init__(*args, **kwargs)
+        # Set up the input and output paths
+        cls.ifpath = os.path.join(cls.scrpath, 'grid20mo6-8.cube')
+        cls.ofpath = os.path.join(cls.scrpath, 'mod.cube')
+
+    def setUp(self):
+        self.copy_scratch()
+
+    def tearDown(self):
+        self.clear_scratch()
 
     def copy_file_remove_line(self, lnum):
         # Pull input contents
@@ -312,7 +355,6 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         # Conversion should fail
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
-
     def test_FxnCubeToH5_MissingYAXISVal(self):
         from h5cube import cube_to_h5
 
@@ -321,7 +363,6 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
         # Conversion should fail
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
-
 
     def test_FxnCubeToH5_MissingZAXISVal(self):
         from h5cube import cube_to_h5
@@ -340,7 +381,6 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
         # Conversion should fail
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
-
 
     def test_FxnCubeToH5_ExtraYAXISVal(self):
         from h5cube import cube_to_h5
@@ -368,7 +408,6 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
         # Conversion should fail
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
-
 
     def test_FxnCubeToH5_ExtraGeomVal(self):
         from h5cube import cube_to_h5
@@ -416,36 +455,18 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
-class SuperCycledAndDataCheck(object):
-    # scrpath and fail should work ok late-bound. Bad practice in general!\
+class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
 
-    # Helper scratch path/filename function
     @classmethod
-    def scrfn(cls, fn):
-        import os
-        return os.path.join(cls.scrpath, fn)
+    def setUpClass(cls):
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
 
-    # Helper runner function
-    @classmethod
-    def runfxn(cls, fxn, ext, work_fn, orig_fn, msg, failobj=None, kwargs={}):
-        try:
-            # Call indicated function with indicated work input file and
-            # any kwargs passed
-            fxn(cls.scrfn(work_fn + ext), **kwargs)
-        except ValueError as e:
-            # Compose the error message
-            errmsg = "Unexpected exception on {0} ({1}): {2}".format(msg,
-                                                                orig_fn, str(e))
-            try:
-                # If a valid fail object is passed, call fail on it
-                failobj.fail(msg=errmsg)
-            except AttributeError:
-                # Otherwise, just raise chained error
-                raise ValueError(errmsg) from e
+    def setUp(self):
+        self.copy_scratch()
 
-
-class TestFunctionsCycled(SuperFunctionsTest, SuperCycledAndDataCheck,
-                          ut.TestCase):
+    def tearDown(self):
+        self.clear_scratch()
 
     def test_FxnCycled_2xCycle(self):
         from h5cube import cube_to_h5 as cth
@@ -478,8 +499,7 @@ class TestFunctionsCycled(SuperFunctionsTest, SuperCycledAndDataCheck,
                         failobj=self)
 
 
-class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
-                             ut.TestCase):
+class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
     from h5cube import H5
 
     # Working filenames
@@ -496,14 +516,13 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
         import os
 
         basefn = 'grid20mo6-8'
+        cls.longMessage = True
 
-        # Superclass setUpClass method (at time of writing, just setting the
-        # longMessage = True)
-        super().setUpClass()
+        # Make sure scratch dir is present
+        cls.ensure_scratch_dir()
 
-        # Hack in the parent setUp method to copy the files &c. only once,
-        #  before all tests run
-        super().setUp(cls)
+        # Copy the resource files only once, before all tests run
+        cls.copy_scratch()
 
         # Rename the multi-MO CUBE to first temp name
         os.rename(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
@@ -523,20 +542,10 @@ class TestFunctionsDataCheck(SuperFunctionsTest, SuperCycledAndDataCheck,
         cls.runfxn(cth, '.cube', cls.fn2, basefn, 'second compression',
                    kwargs={'trunc': -cls.logtol})
 
-    def setUp(self):
-        # Override the parent setUp method to prevent it from running
-        # again and likely making a hash of the scratch directory
-        pass
-
-    def tearDown(self):
-        # Intercept. Don't want the scratch dir scrubbed after each test
-        pass
-
     @classmethod
     def tearDownClass(cls):
-        # Want to run the parent tearDown at the end of running all of the
-        # tests here
-        super().tearDown(cls)
+        # Clean up the scratch dir
+        cls.clear_scratch()
 
     def do_h5py_test(self, key):
         import h5py as h5
