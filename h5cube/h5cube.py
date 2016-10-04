@@ -255,7 +255,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # For orbital files, an extra dimension will be present, even if
         #  there's only one dataset!
         logdataarr = np.zeros(dims)
-        signsarr = np.zeros(dims)
+        signsarr = np.zeros(dims, dtype=np.int8)
 
         # Preassign the calculated minmax values if isofactored thresh
         # is enabled
@@ -275,7 +275,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             st_val = _convertval(val, signed, thresh, minmax)
 
             # Store in the pre-sized data containers
-            signsarr[t] = st_val[0]
+            signsarr[t] = np.int8(st_val[0])
             logdataarr[t] = st_val[1]
 
         # Ensure exhausted
@@ -285,7 +285,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=trunc)
         hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
-                          compression_opts=comp, shuffle=True)
+                          compression_opts=comp, shuffle=True, scaleoffset=0)
 
     # If indicated, delete the source file
     if delsrc:
