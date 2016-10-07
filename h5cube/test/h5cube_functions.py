@@ -80,7 +80,8 @@ class SuperFunctionsTest(object):
                                  'grid25mo': 21929,
                                  'grid20mo6-8': 27516}}
 
-    fsize_delta = 20 # bytes filesize match window
+    # bytes filesize match window
+    fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20
 
     @staticmethod
     def shortsleep():
@@ -175,14 +176,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
 
             h5path = os.path.splitext(fn)[0] + '.h5cube'
             h5path = os.path.join(self.scrpath, h5path)
-            if hasattr(self, 'subTest'): # Needed since claiming py3.3 support
-                with self.subTest(file=fn):
-                    self.assertAlmostEqual(os.path.getsize(h5path),
-                                           sizes[os.path.splitext(fn)[0]],
-                                           delta=self.fsize_delta,  # bytes +/-
-                                           msg="Unexpected filesize: {0}"
-                                           .format(h5path))
-            else:
+            with self.subTest(file=fn):
                 self.assertAlmostEqual(os.path.getsize(h5path),
                                        sizes[os.path.splitext(fn)[0]],
                                        delta=self.fsize_delta,  # bytes +/-
