@@ -254,6 +254,35 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         # Confirm source file was deleted
         self.assertFalse(os.path.isfile(fn))
 
+    def test_FxnCubeToH5_MultiLineOrbsList(self):
+        import os
+
+        # Filenames
+        ifname = 'grid20mo6-8.cube'
+        ofname = 'mod.cube'
+
+        # Remove the non-interesting files
+        [os.remove(self.scrfn(n)) for n in os.listdir(self.scrpath)
+         if n != ifname]
+
+        # Move the last orbital index to a new line. According to OpenBabel
+        # implementation of CUBE import, this should read fine.
+        with open(self.scrfn(ifname), 'r') as ifile:
+            with open(self.scrfn(ofname), 'w') as ofile:
+                for i, l in enumerate(ifile):
+                    if i != 13:
+                        ofile.write(l)
+                    else:
+                        ofile.write(l[:-2] + '\n')
+                        ofile.write("    " + l[-2:]) # should include a newline
+
+        # Remove the original file and rename the new to the old
+        os.remove(self.scrfn(ifname))
+        os.rename(self.scrfn(ofname), self.scrfn(ifname))
+
+        # Try to process the output file (should be only the one left)
+        self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name])
+
 
 class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
 
@@ -584,41 +613,11 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                         self.assertTrue((hf1.get(key).value ==
                                          hf2.get(key).value).all())
 
-    def test_FxnDataCheck_COMMENT1_Check(self):
-        self.do_h5py_test(self.H5.COMMENT1)
-
-    def test_FxnDataCheck_COMMENT2_Check(self):
-        self.do_h5py_test(self.H5.COMMENT2)
-
-    def test_FxnDataCheck_NUM_DSETS_Check(self):
-        self.do_h5py_test(self.H5.NUM_DSETS)
-
-    def test_FxnDataCheck_NATOMS_Check(self):
-        self.do_h5py_test(self.H5.NATOMS)
-
-    def test_FxnDataCheck_DSET_IDS_Check(self):
-        self.do_h5py_test(self.H5.DSET_IDS)
-
-    def test_FxnDataCheck_GEOM_Check(self):
-        self.do_h5py_test(self.H5.GEOM)
-
-    def test_FxnDataCheck_ORIGIN_Check(self):
-        self.do_h5py_test(self.H5.ORIGIN)
-
-    def test_FxnDataCheck_XAXIS_Check(self):
-        self.do_h5py_test(self.H5.XAXIS)
-
-    def test_FxnDataCheck_YAXIS_Check(self):
-        self.do_h5py_test(self.H5.YAXIS)
-
-    def test_FxnDataCheck_ZAXIS_Check(self):
-        self.do_h5py_test(self.H5.ZAXIS)
-
-    def test_FxnDataCheck_SIGNS_Check(self):
-        self.do_h5py_test(self.H5.SIGNS)
-
-    def test_FxnDataCheck_LOGDATA_Check(self):
-        self.do_h5py_test(self.H5.LOGDATA)
+    def test_FxnDataCheck_Unified_Check(self):
+        for key in [k for k in vars(self.H5)
+                    if k == k.upper() and k == getattr(self.H5, k)]:
+            with self.subTest(key=key):
+                self.do_h5py_test(key)
 
 
 def suite_misc():
