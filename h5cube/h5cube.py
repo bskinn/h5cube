@@ -219,9 +219,22 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
 
             # Try to retrieve num_dsets values for the orbital indices;
             #  complain if not enough, or if too many, and write the dataset
-            dset_ids = list(int(_trynext(elements, H5.DSET_IDS))
-                                for _ in range(num_dsets))
+            # Initialize the container
+            dset_ids = []
+
+            # Loop while more values expected
+            while len(dset_ids) < num_dsets:
+                try:
+                    # Try appending the next value in the iterator
+                    dset_ids.append(int(next(elements)))
+                except StopIteration:
+                    # Ran out of values. Pull the next line.
+                    elements = iter(_trynext(datalines, H5.DSET_IDS).split())
+
+            # Make sure the most recent line was fully exhausted.
             _trynonext(elements, H5.DSET_IDS)
+
+            # Store the dataset
             hf.create_dataset(H5.DSET_IDS, data=dset_ids)
 
             # Extend the dimensions array with the number of datasets
@@ -281,7 +294,8 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Ensure exhausted
         _trynonext(dataiter, H5.LOGDATA)
 
-        # Store the arrays, compressed
+        # Store the arrays, compressed (implicitly activates auto-sized
+        #  chunking)
         hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=trunc)
         hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
@@ -359,17 +373,22 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
                 # Write the dataset dimension to the output
                 f.write(hdr_orbinfo.format(dims[-1]))
 
-                # Write all of the orbital dataset IDs to output. Have to have
-                # the wrapping 'list' call since the write depends on
-                # the materialization of the iterator.
-                list(map(lambda s: f.write(hdr_orbinfo.format(int(s))),
-                         iter(hf[H5.DSET_IDS].value)))
+                # Write all of the orbital dataset IDs to output.
+                for i, v in enumerate(hf[H5.DSET_IDS].value):
+                    # Write the formatted value (mostly just adding spaces)
+                    f.write(hdr_orbinfo.format(int(v)))
 
-                # Cap with EOL
-                f.write('\n')
+                    # Write at most six entries per line; always include
+                    # an EOL after the final value
+                    if i % 6 == 4 or i == dims[-1] - 1:
+                        f.write('\n')
 
             # Write the data blocks
             # Pull them from the .h5cube file first
+            # Value-by-value data retrieval was tried and found to be
+            #  HORRIFICALLY slow. Chunk-by-chunk retrieval might be better
+            #  speed-wise, but appears to decrease the .h5cube compression
+            #  factor by at least two-fold.
             signs = hf[H5.SIGNS].value
             logvals = hf[H5.LOGDATA].value
 
