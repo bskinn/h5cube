@@ -89,6 +89,7 @@ def _convertval(val, signed, thresh, minmax):
             elif val > minmax[1]:
                 val = minmax[1]
         else:
+            # Zero values remain zero since np.sign(0.0) == 0.0
             if np.abs(val) < minmax[0]:
                 val = np.sign(val) * minmax[0]
             elif np.abs(val) > minmax[1]:
@@ -230,6 +231,13 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                 except StopIteration:
                     # Ran out of values. Pull the next line.
                     elements = iter(_trynext(datalines, H5.DSET_IDS).split())
+                except ValueError as e:
+                    # Catch a non-integer value, for the case where there \
+                    # aren't enough dataset ID values and parsing
+                    # erroneously moves to data values.
+                    raise ValueError(
+                        "Data prematurely exhausted in '{0}' dataset"
+                        .format(H5.DSET_IDS)) from e
 
             # Make sure the most recent line was fully exhausted.
             _trynonext(elements, H5.DSET_IDS)

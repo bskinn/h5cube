@@ -23,18 +23,47 @@ class TestFunctionsMisc(ut.TestCase):
     def setUpClass(cls):
         cls.longMessage = True
 
-    def test_FxnMisc_ExpFormatGood(self):
+    def test_FxnMisc_ExpFormat_Good(self):
         from h5cube.h5cube import _exp_format as _ef
 
-        self.assertEqual(_ef(0.0183, 5), "  1.83000E-02")
-        self.assertEqual(_ef(-11.2**99, 3), " -7.457E+103")
-        self.assertEqual(_ef(2.853 * 3.122e-123, 6), "  8.907066E-123")
+        with self.subTest(type='typical'):
+            self.assertEqual(_ef(0.0183, 5), "  1.83000E-02")
 
-    def test_FxnMisc_ExpFormatBad(self):
+        with self.subTest(type='3-digit large'):
+            self.assertEqual(_ef(-11.2**99, 3), " -7.457E+103")
+
+        with self.subTest(type='3-digit small'):
+            self.assertEqual(_ef(2.853 * 3.122e-123, 6), "  8.907066E-123")
+
+    def test_FxnMisc_ExpFormat_Bad(self):
         from h5cube.h5cube import _exp_format as _ef
 
-        self.assertRaises(ValueError, _ef, "abcd", 5)
-        self.assertRaises(TypeError, _ef, ValueError(), 2)
+        with self.subTest(type='string'):
+            self.assertRaises(ValueError, _ef, "abcd", 5)
+
+        with self.subTest(type='object'):
+            self.assertRaises(TypeError, _ef, ValueError(), 2)
+
+    def test_FxnMisc_ConvertVal_Good(self):
+        from h5cube.h5cube import _convertval as _cv
+        import math as m
+
+        params=[{'name': 'zero', 'val': 0.0, 's': False, 't': False,
+                 'm': None, 'ret': [0.0, 0.0]},
+                {'name': 'zeroThresh', 'val': 0.0, 's': False, 't': True,
+                 'm': [0.1, 10], 'ret': [0.0, 0.0]},
+                {'name': 'pos', 'val': 1.0/m.pi, 's': False, 't': False,
+                 'm': None, 'ret': [1.0, -0.4971495]},
+                {'name': 'neg', 'val': m.asin(-0.8), 's': False, 't': False,
+                 'm': None, 'ret': [-1.0, -0.03278198]}]
+
+        for p in params:
+            tval = _cv(p['val'], p['s'], p['t'], p['m'])
+
+            with self.subTest(type=p['name'] + '_sign'):
+                self.assertAlmostEqual(tval[0], p['ret'][0], delta=1e-5)
+            with self.subTest(type=p['name'] + '_logval'):
+                self.assertAlmostEqual(tval[1], p['ret'][1], delta=1e-5)
 
 
 class SuperFunctionsTest(object):
