@@ -48,14 +48,23 @@ class TestFunctionsMisc(ut.TestCase):
         from h5cube.h5cube import _convertval as _cv
         import math as m
 
-        params=[{'name': 'zero', 'val': 0.0, 's': False, 't': False,
-                 'm': None, 'ret': [0.0, 0.0]},
-                {'name': 'zeroThresh', 'val': 0.0, 's': False, 't': True,
-                 'm': [0.1, 10], 'ret': [0.0, 0.0]},
-                {'name': 'pos', 'val': 1.0/m.pi, 's': False, 't': False,
-                 'm': None, 'ret': [1.0, -0.4971495]},
-                {'name': 'neg', 'val': m.asin(-0.8), 's': False, 't': False,
-                 'm': None, 'ret': [-1.0, -0.03278198]}]
+        params=[{'name': 'zero', 'val': 0.0, 's': False,
+                 't': False, 'm': None, 'ret': [0.0, 0.0]},
+                {'name': 'zeroThresh', 'val': 0.0, 's': False,
+                 't': True, 'm': [0.1, 10], 'ret': [1.0, -1.0]},
+                {'name': 'pos', 'val': 1.0/m.pi, 's': False,
+                 't': False, 'm': None, 'ret': [1.0, -0.4971495]},
+                {'name': 'neg', 'val': m.asin(-0.8), 's': False,
+                 't': False, 'm': None, 'ret': [-1.0, -0.03278198]},
+                {'name': 'posThMax', 'val': 10.0**2.5, 's': False,
+                 't': True, 'm': [0.1, 30.2], 'ret': [1.0, 1.480007]},
+                {'name': 'posThMin', 'val': 3e-3, 's': False,
+                 't': True, 'm': [0.15, 4], 'ret': [1.0, -0.8239087]},
+                {'name': 'negThMax', 'val': -3000.51, 's': False,
+                 't': True, 'm': [0.2, m.pi**3], 'ret': [-1.0, 1.4914496]},
+                {'name': 'negThMin', 'val': -3e-6, 's': False,
+                 't': True, 'm': [m.pi**-0.02, 50], 'ret': [-1.0, -0.009943]}]
+                #{'name': 'posSgThMax', 'val' =  ]
 
         for p in params:
             tval = _cv(p['val'], p['s'], p['t'], p['m'])
@@ -65,6 +74,49 @@ class TestFunctionsMisc(ut.TestCase):
             with self.subTest(type=p['name'] + '_logval'):
                 self.assertAlmostEqual(tval[1], p['ret'][1], delta=1e-5)
 
+    def test_FxnMisc_ConvertVal_Bad(self):
+        from h5cube.h5cube import _convertval as _cv
+
+        with self.subTest(type='invert_minmax'):
+            self.assertRaises(ValueError, _cv, val=1, signed=False,
+                              thresh=True, minmax=[10, 0.1])
+
+        with self.subTest(type='unsigned_neg_minmax'):
+            self.assertRaises(ValueError, _cv, val=1, signed=False,
+                              thresh=True, minmax = [-1, 1])
+
+    def test_FxnMisc_TryNext(self):
+        from h5cube.h5cube import _trynext
+
+        with self.subTest(type='not_exhausted'):
+            i = iter(range(5))
+            next(i)
+            next(i)
+            self.assertEqual(_trynext(i, msg='Testing'), 2)
+
+        with self.subTest(type='exhausted'):
+            i = iter(range(2))
+            next(i)
+            next(i)
+            self.assertRaises(ValueError, _trynext, i, msg='Testing')
+
+    def test_FxnMisc_TryNoNext(self):
+        from h5cube.h5cube import _trynonext
+
+        with self.subTest(type='not_exhausted'):
+            i = iter(range(3))
+            next(i)
+            self.assertRaises(ValueError, _trynonext, i, msg='Testing')
+
+        with self.subTest(type='exhausted'):
+            i = iter(range(2))
+            next(i)
+            next(i)
+            try:
+                _trynonext(i, 'Testing')
+            except ValueError:
+                self.fail()
+
 
 class SuperFunctionsTest(object):
     import os
@@ -73,39 +125,51 @@ class SuperFunctionsTest(object):
     respath = os.path.join('h5cube', 'test', 'resource')
 
     sizes_noargs = {'nt': {'grid20': 38876,
+                           'grid20ang': 38876,
                            'grid25mo': 60151,
                            'grid20mo6-8': 89504},
                     'posix': {'grid20': 38928,
+                              'grid20ang': 38928,
                               'grid25mo': 60098,
                               'grid20mo6-8': 89196}}
     sizes_t2 = {'nt': {'grid20': 28876,
+                       'grid20ang': 28876,
                        'grid25mo': 40530,
                        'grid20mo6-8': 55860},
                 'posix': {'grid20': 28584,
+                          'grid20ang': 28584,
                           'grid25mo': 40582,
                           'grid20mo6-8': 55552}}
     sizes_m1e_8m10 = {'nt': {'grid20': 23989,
+                             'grid20ang': 23989,
                              'grid25mo': 52313,
                              'grid20mo6-8': 80454},
                       'posix': {'grid20': 24041,
-                                'grid25mo': 52428,
-                                'grid20mo6-8': 80254}}
+                                'grid20ang': 24041,
+                                'grid25mo': 51659,
+                                'grid20mo6-8': 79154}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
+                             'grid20ang': 17612,
                              'grid25mo': 26249,
                              'grid20mo6-8': 36446},
                       'posix': {'grid20': 17664,
-                                'grid25mo': 26301,
-                                'grid20mo6-8': 36314}}
+                                'grid20ang': 17664,
+                                'grid25mo': 25307,
+                                'grid20mo6-8': 34440}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
+                                 'grid20ang': 19660,
                                  'grid25mo': 31995,
                                  'grid20mo6-8': 48114},
                           'posix': {'grid20': 18038,
-                                    'grid25mo': 32047,
-                                    'grid20mo6-8': 47969}}
+                                    'grid20ang': 18038,
+                                    'grid25mo': 30667,
+                                    'grid20mo6-8': 45982}}
     sizes_si0x002f5 = {'nt': {'grid20': 17612,
+                              'grid20ang': 17612,
                               'grid25mo': 22138,
                               'grid20mo6-8': 27689},
                        'posix': {'grid20': 17664,
+                                 'grid20ang': 17664,
                                  'grid25mo': 21929,
                                  'grid20mo6-8': 27516}}
 
@@ -124,6 +188,9 @@ class SuperFunctionsTest(object):
         # Ensure scratch directory exists
         if not os.path.isdir(cls.scrpath):
             os.mkdir(cls.scrpath)
+
+        # Ensure scratch directory is empty
+        cls.clear_scratch()
 
     @classmethod
     def copy_scratch(cls):
@@ -574,7 +641,7 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
     def setUpClass(cls):
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
-        import os
+        import os, shutil
 
         basefn = 'grid20mo6-8'
         cls.longMessage = True
@@ -585,8 +652,8 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
         # Copy the resource files only once, before all tests run
         cls.copy_scratch()
 
-        # Rename the multi-MO CUBE to first temp name
-        os.rename(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
+        # Copy the multi-MO CUBE to first temp name
+        shutil.copy(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
 
         # First compression
         cls.runfxn(cth, '.cube', cls.fn1, basefn, 'first compression',
@@ -642,11 +709,45 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                         self.assertTrue((hf1.get(key).value ==
                                          hf2.get(key).value).all())
 
-    def test_FxnDataCheck_Unified_Check(self):
+    def test_FxnDataCheck_H5_Unified_Check(self):
         for key in [k for k in vars(self.H5)
                     if k == k.upper() and k == getattr(self.H5, k)]:
             with self.subTest(key=key):
                 self.do_h5py_test(key)
+
+    def test_FxnDataCheck_Cube_Header_Check(self):
+        from h5cube import cube_to_h5 as cth
+        from h5cube import h5_to_cube as htc
+        from itertools import zip_longest as zipl
+        import os
+
+        checklines = {'grid20.cube': 20,
+                      'grid20ang.cube': 20,
+                      'grid25mo.cube': 12,
+                      'grid20mo6-8.cube': 12}
+
+        for fn in [f for f in os.listdir(self.respath) if f.endswith('.cube')]:
+            # Compress, rename, decompress
+            old_fn = os.path.splitext(fn)[0] + 'old.cube'
+            cth(self.scrfn(fn))
+            os.rename(self.scrfn(fn), self.scrfn(old_fn))
+            htc(self.scrfn(os.path.splitext(fn)[0] + '.h5cube'))
+
+            # Open the .cubes and check the header contents
+            with open(self.scrfn(fn), 'r') as newf:
+                with open(self.scrfn(old_fn), 'r') as oldf:
+                    # Comment lines
+                    with self.subTest(fn=fn, type='comment1'):
+                        self.assertEqual(next(newf), next(oldf))
+                    with self.subTest(fn=fn, type='comment2'):
+                        self.assertEqual(next(newf), next(oldf))
+
+                    # Data lines
+                    for i in range(checklines[fn]):
+                        for j, t in enumerate(zipl(next(oldf).split(),
+                                                   next(newf).split())):
+                            with self.subTest(fn=fn, line=i, element=j):
+                                self.assertEqual(t[0], t[1])
 
 
 def suite_misc():

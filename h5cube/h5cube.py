@@ -55,6 +55,7 @@ class DEF(object):
 
 # Exit codes
 class EXIT(object):
+    OK = 0
     GENERIC = 1
     CMDLINE = 2
     FILEREAD = 4
@@ -89,9 +90,8 @@ def _convertval(val, signed, thresh, minmax):
             elif val > minmax[1]:
                 val = minmax[1]
         else:
-            # Zero values remain zero since np.sign(0.0) == 0.0
             if np.abs(val) < minmax[0]:
-                val = np.sign(val) * minmax[0]
+                val = (np.sign(val) if val else 1.0) * minmax[0]
             elif np.abs(val) > minmax[1]:
                 val = np.sign(val) * minmax[1]
 
