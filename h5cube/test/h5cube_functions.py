@@ -63,16 +63,20 @@ class TestFunctionsMisc(ut.TestCase):
                 {'name': 'negThMax', 'val': -3000.51, 's': False,
                  't': True, 'm': [0.2, m.pi**3], 'ret': [-1.0, 1.4914496]},
                 {'name': 'negThMin', 'val': -3e-6, 's': False,
-                 't': True, 'm': [m.pi**-0.02, 50], 'ret': [-1.0, -0.009943]}]
-                #{'name': 'posSgThMax', 'val' =  ]
+                 't': True, 'm': [m.pi**-0.02, 50], 'ret': [-1.0, -0.009943]},
+                {'name': 'posSgThMax', 'val': 3, 's': True,
+                 't': True, 'm': [-30, -2.54], 'ret': [-1.0, 0.4048337]},
+                {'name': 'negSgThMin', 'val': -4, 's': True,
+                 't': True, 'm': [m.exp(-10), 8], 'ret': [1.0, -4.3429448]}]
+
+        suffix = ['_sign', '_logval']
 
         for p in params:
             tval = _cv(p['val'], p['s'], p['t'], p['m'])
 
-            with self.subTest(type=p['name'] + '_sign'):
-                self.assertAlmostEqual(tval[0], p['ret'][0], delta=1e-5)
-            with self.subTest(type=p['name'] + '_logval'):
-                self.assertAlmostEqual(tval[1], p['ret'][1], delta=1e-5)
+            for i, s in enumerate(suffix):
+                with self.subTest(type=p['name'] + s):
+                    self.assertAlmostEqual(tval[i], p['ret'][i], delta=1e-5)
 
     def test_FxnMisc_ConvertVal_Bad(self):
         from h5cube.h5cube import _convertval as _cv
@@ -142,24 +146,24 @@ class SuperFunctionsTest(object):
                           'grid20mo6-8': 55552}}
     sizes_m1e_8m10 = {'nt': {'grid20': 23989,
                              'grid20ang': 23989,
-                             'grid25mo': 52313,
-                             'grid20mo6-8': 80454},
+                             'grid25mo': 51871,
+                             'grid20mo6-8': 79215},
                       'posix': {'grid20': 24041,
                                 'grid20ang': 24041,
                                 'grid25mo': 51659,
                                 'grid20mo6-8': 79154}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
                              'grid20ang': 17612,
-                             'grid25mo': 26249,
-                             'grid20mo6-8': 36446},
+                             'grid25mo': 25488,
+                             'grid20mo6-8': 34610},
                       'posix': {'grid20': 17664,
                                 'grid20ang': 17664,
                                 'grid25mo': 25307,
                                 'grid20mo6-8': 34440}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
                                  'grid20ang': 19660,
-                                 'grid25mo': 31995,
-                                 'grid20mo6-8': 48114},
+                                 'grid25mo': 30879,
+                                 'grid20mo6-8': 46085},
                           'posix': {'grid20': 18038,
                                     'grid20ang': 18038,
                                     'grid25mo': 30667,

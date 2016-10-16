@@ -82,6 +82,16 @@ def _convertval(val, signed, thresh, minmax):
 
     import numpy as np
 
+    # Min <= Max is required. Can't imagine a use-case for equal min and max
+    # at the moment, but may be desired by someone at some point?
+    if thresh and minmax is not None and minmax[0] > minmax[1]:
+        raise ValueError('min <= max is required')
+
+    # If using unsigned thresholding, both min and max have to be non-negative
+    if thresh and (not signed) and minmax is not None and \
+                                                np.any(np.array(minmax) < 0):
+        raise ValueError('0 <= min <= max required for unsigned thresholding')
+
     # Threshold, if indicated
     if thresh:
         if signed:
@@ -95,6 +105,9 @@ def _convertval(val, signed, thresh, minmax):
             elif np.abs(val) > minmax[1]:
                 val = np.sign(val) * minmax[1]
 
+    # Special return value for zero; otherwise calculate the separate
+    # values for the sign of the value and the base-10 logarithm of its
+    # absolute value.
     if val == 0.0:
         return [0.0, 0.0]
     else:
