@@ -75,43 +75,43 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
-def _convertval(val, signed, thresh, minmax):
-    """ [Docstring]
-
-    """
-
-    import numpy as np
-
-    # Min <= Max is required. Can't imagine a use-case for equal min and max
-    # at the moment, but may be desired by someone at some point?
-    if thresh and minmax is not None and minmax[0] > minmax[1]:
-        raise ValueError('min <= max is required')
-
-    # If using unsigned thresholding, both min and max have to be non-negative
-    if thresh and (not signed) and minmax is not None and \
-                                                np.any(np.array(minmax) < 0):
-        raise ValueError('0 <= min <= max required for unsigned thresholding')
-
-    # Threshold, if indicated
-    if thresh:
-        if signed:
-            if val < minmax[0]:
-                val = minmax[0]
-            elif val > minmax[1]:
-                val = minmax[1]
-        else:
-            if np.abs(val) < minmax[0]:
-                val = (np.sign(val) if val else 1.0) * minmax[0]
-            elif np.abs(val) > minmax[1]:
-                val = np.sign(val) * minmax[1]
-
-    # Special return value for zero; otherwise calculate the separate
-    # values for the sign of the value and the base-10 logarithm of its
-    # absolute value.
-    if val == 0.0:
-        return [0.0, 0.0]
-    else:
-        return [np.sign(val), np.log10(np.abs(val))]
+# def _convertval(val, signed, thresh, minmax):
+#     """ [Docstring]
+#
+#     """
+#
+#     import numpy as np
+#
+#     # Min <= Max is required. Can't imagine a use-case for equal min and max
+#     # at the moment, but may be desired by someone at some point?
+#     if thresh and minmax is not None and minmax[0] > minmax[1]:
+#         raise ValueError('min <= max is required')
+#
+#     # If using unsigned thresholding, both min and max have to be non-negative
+#     if thresh and (not signed) and minmax is not None and \
+#                                                 np.any(np.array(minmax) < 0):
+#         raise ValueError('0 <= min <= max required for unsigned thresholding')
+#
+#     # Threshold, if indicated
+#     if thresh:
+#         if signed:
+#             if val < minmax[0]:
+#                 val = minmax[0]
+#             elif val > minmax[1]:
+#                 val = minmax[1]
+#         else:
+#             if np.abs(val) < minmax[0]:
+#                 val = (np.sign(val) if val else 1.0) * minmax[0]
+#             elif np.abs(val) > minmax[1]:
+#                 val = np.sign(val) * minmax[1]
+#
+#     # Special return value for zero; otherwise calculate the separate
+#     # values for the sign of the value and the base-10 logarithm of its
+#     # absolute value.
+#     if val == 0.0:
+#         return [0.0, 0.0]
+#     else:
+#         return [np.sign(val), np.log10(np.abs(val))]
 
 
 def _trynext(iterator, msg):
@@ -193,7 +193,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                                          for _ in range(3)]))
 
         # Complain if too much data
-        _trynonext(elements, "system origin")
+        _trynonext(elements, H5.ORIGIN)
 
         # === SYSTEM AXES ===
         # Dimensions and vectors
@@ -295,50 +295,55 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[1] = isofactor[0] * isofactor[1]
 
         # Fill the working numpy object
-        workdataarr = np.array(list(map(lambda s: float(s.group(0)),
+        workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
                                         dataiter))).reshape(dims)
 
         # Store the signs for output
         signsarr = np.sign(workdataarr).astype(np.int8)
 
+        # Initial framework for low-RAM vs faster implementation
+        # if lowmem:
         # Adjusted working log values; zeroes substituted with ones
-        adjdataarr = workdataarr + (1.0 - np.sign(np.abs(workdataarr)))
+        np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
 
-        # Threshold
+        # Threshold. Spread out the np calls for easier reading, and calculate
+        # in-place for reduced RAM usage.
         if thresh:
             if signed:
-                logdataarr = np.log10(np.abs(np.clip(adjdataarr, *minmax)))
+                # Threshold, then absval
+                np.clip(workdataarr, *minmax, out=workdataarr)
+                np.abs(workdataarr, out=workdataarr)
             else:
-                logdataarr = np.log10(np.clip(np.abs(adjdataarr), *minmax))
+                # Absval, then threshold
+                np.abs(workdataarr, out=workdataarr)
+                np.clip(workdataarr, *minmax, out=workdataarr)
         else:
-            logdataarr = np.log10(np.abs(adjdataarr))
+            # Just absval if no thresholding
+            np.abs(workdataarr, out=workdataarr)
 
-        # # Initialize the numpy objects
-        # # For orbital files, an extra dimension will be present, even if
-        # #  there's only one dataset!
-        # logdataarr = np.zeros(dims)
-        # signsarr = np.zeros(dims, dtype=np.int8)
+        # Finish with log base 10
+        np.log10(workdataarr, out=workdataarr)
 
-
-
-        # # Loop over the respective dimensions to store the dataset
-        # for t in itt.product(*map(range, dims)):
-        #     # Retrieve the next value
-        #     val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+        # else:
+        #     # Adjusted working log values; zeroes substituted with ones
+        #     workdataarr = workdataarr + (1.0 - np.sign(np.abs(workdataarr)))
         #
-        #     # Convert to storage data values
-        #     st_val = _convertval(val, signed, thresh, minmax)
+        #     # Threshold, if indicated, and calculate log10(abs(..))
+        #     if thresh:
+        #         if signed:
+        #             # Threshold, then absval
+        #             workdataarr = np.log10(np.abs(np.clip(workdataarr, *minmax)))
         #
-        #     # Store in the pre-sized data containers
-        #     signsarr[t] = np.int8(st_val[0])
-        #     logdataarr[t] = st_val[1]
-
-        # Ensure exhausted
-        _trynonext(dataiter, H5.LOGDATA)
+        #         else:
+        #             # Absval, then threshold
+        #             workdataarr = np.log10(np.clip(np.abs(workdataarr), *minmax))
+        #
+        #     else:
+        #         workdataarr = np.log10(np.abs(workdataarr))
 
         # Store the arrays, compressed (implicitly activates auto-sized
         #  chunking)
-        hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
+        hf.create_dataset(H5.LOGDATA, data=workdataarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=trunc)
         hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=0)
