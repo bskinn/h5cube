@@ -285,12 +285,6 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         dataiter = itt.chain.from_iterable(p_scinot.finditer(l)
                                            for l in datalines)
 
-        # Initialize the numpy objects
-        # For orbital files, an extra dimension will be present, even if
-        #  there's only one dataset!
-        logdataarr = np.zeros(dims)
-        signsarr = np.zeros(dims, dtype=np.int8)
-
         # Preassign the calculated minmax values if isofactored thresh
         # is enabled
         if thresh and isofactor is not None:
@@ -300,17 +294,44 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[0] = isofactor[0] / isofactor[1]
             minmax[1] = isofactor[0] * isofactor[1]
 
-        # Loop over the respective dimensions to store the dataset
-        for t in itt.product(*map(range, dims)):
-            # Retrieve the next value
-            val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+        # Fill the working numpy object
+        workdataarr = np.array(list(map(lambda s: float(s.group(0)),
+                                        dataiter))).reshape(dims)
 
-            # Convert to storage data values
-            st_val = _convertval(val, signed, thresh, minmax)
+        # Store the signs for output
+        signsarr = np.sign(workdataarr).astype(np.int8)
 
-            # Store in the pre-sized data containers
-            signsarr[t] = np.int8(st_val[0])
-            logdataarr[t] = st_val[1]
+        # Adjusted working log values; zeroes substituted with ones
+        adjdataarr = workdataarr + (1.0 - np.sign(np.abs(workdataarr)))
+
+        # Threshold
+        if thresh:
+            if signed:
+                logdataarr = np.log10(np.abs(np.clip(adjdataarr, *minmax)))
+            else:
+                logdataarr = np.log10(np.clip(np.abs(adjdataarr), *minmax))
+        else:
+            logdataarr = np.log10(np.abs(adjdataarr))
+
+        # # Initialize the numpy objects
+        # # For orbital files, an extra dimension will be present, even if
+        # #  there's only one dataset!
+        # logdataarr = np.zeros(dims)
+        # signsarr = np.zeros(dims, dtype=np.int8)
+
+
+
+        # # Loop over the respective dimensions to store the dataset
+        # for t in itt.product(*map(range, dims)):
+        #     # Retrieve the next value
+        #     val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+        #
+        #     # Convert to storage data values
+        #     st_val = _convertval(val, signed, thresh, minmax)
+        #
+        #     # Store in the pre-sized data containers
+        #     signsarr[t] = np.int8(st_val[0])
+        #     logdataarr[t] = st_val[1]
 
         # Ensure exhausted
         _trynonext(dataiter, H5.LOGDATA)
@@ -336,6 +357,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
 
     import h5py as h5
     import itertools as itt
+    import numpy as np
     import os
 
     # Default precision value, if no value passed on commandline
@@ -412,13 +434,15 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
             #  factor by at least two-fold.
             signs = hf[H5.SIGNS].value
             logvals = hf[H5.LOGDATA].value
+            outvals = np.multiply(signs, 10.0**logvals)
 
             # Can just run a combinatorial iterator over the dimensions
             # of the dataset
             for i, t in enumerate(itt.product(*map(range, dims))):
                 # f.write(_exp_format(hf[H5.SIGNS].value[t] *
                 #                     10.**hf[H5.LOGDATA].value[t], prec))
-                f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
+                # f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
+                f.write(_exp_format(outvals[t], prec))
 
                 # Newline to wrap at a max of six values per line, or if at
                 # the last entry of a z-iteration and at the last dataset,
