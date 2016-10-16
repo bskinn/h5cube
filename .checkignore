@@ -1,0 +1,6 @@
+.gitignore
+LICENSE.txt
+README.rst
+doc/*
+tests.py
+h5cube/test/*
