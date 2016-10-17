@@ -75,45 +75,6 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
-def _convertval(val, signed, thresh, minmax):
-    """ [Docstring]
-
-    """
-
-    import numpy as np
-
-    # Min <= Max is required. Can't imagine a use-case for equal min and max
-    # at the moment, but may be desired by someone at some point?
-    if thresh and minmax is not None and minmax[0] > minmax[1]:
-        raise ValueError('min <= max is required')
-
-    # If using unsigned thresholding, both min and max have to be non-negative
-    if thresh and (not signed) and minmax is not None and \
-                                                np.any(np.array(minmax) < 0):
-        raise ValueError('0 <= min <= max required for unsigned thresholding')
-
-    # Threshold, if indicated
-    if thresh:
-        if signed:
-            if val < minmax[0]:
-                val = minmax[0]
-            elif val > minmax[1]:
-                val = minmax[1]
-        else:
-            if np.abs(val) < minmax[0]:
-                val = (np.sign(val) if val else 1.0) * minmax[0]
-            elif np.abs(val) > minmax[1]:
-                val = np.sign(val) * minmax[1]
-
-    # Special return value for zero; otherwise calculate the separate
-    # values for the sign of the value and the base-10 logarithm of its
-    # absolute value.
-    if val == 0.0:
-        return [0.0, 0.0]
-    else:
-        return [np.sign(val), np.log10(np.abs(val))]
-
-
 def _trynext(iterator, msg):
     """ [Docstring]
 
@@ -193,7 +154,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                                          for _ in range(3)]))
 
         # Complain if too much data
-        _trynonext(elements, "system origin")
+        _trynonext(elements, H5.ORIGIN)
 
         # === SYSTEM AXES ===
         # Dimensions and vectors
@@ -245,7 +206,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                     # Ran out of values. Pull the next line.
                     elements = iter(_trynext(datalines, H5.DSET_IDS).split())
                 except ValueError as e:
-                    # Catch a non-integer value, for the case where there \
+                    # Catch a non-integer value, for the case where there
                     # aren't enough dataset ID values and parsing
                     # erroneously moves to data values.
                     raise ValueError(
@@ -266,9 +227,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             hf.create_dataset(H5.NUM_DSETS, data=H5.VAL_NOT_ORBFILE)
             hf.create_dataset(H5.DSET_IDS, data=np.array([]))
 
-        # Volumetric field data
-        # Create one big iterator over a scientific notation regular
-        #  expression for the remainder of the file
+        # === VOLUMETRIC FIELD DATA ===
 
         # Regex pattern for lines of scientific notation
         p_scinot = re.compile("""
@@ -285,12 +244,6 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         dataiter = itt.chain.from_iterable(p_scinot.finditer(l)
                                            for l in datalines)
 
-        # Initialize the numpy objects
-        # For orbital files, an extra dimension will be present, even if
-        #  there's only one dataset!
-        logdataarr = np.zeros(dims)
-        signsarr = np.zeros(dims, dtype=np.int8)
-
         # Preassign the calculated minmax values if isofactored thresh
         # is enabled
         if thresh and isofactor is not None:
@@ -300,24 +253,43 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[0] = isofactor[0] / isofactor[1]
             minmax[1] = isofactor[0] * isofactor[1]
 
-        # Loop over the respective dimensions to store the dataset
-        for t in itt.product(*map(range, dims)):
-            # Retrieve the next value
-            val = float(_trynext(dataiter, H5.LOGDATA).group(0))
+        # Fill the working numpy object, chaining a more informative exception
+        # if the data pull fails
+        try:
+            workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
+                                            dataiter))).reshape(dims)
+        except ValueError as e:
+            raise ValueError('Error parsing volumetric data') from e
 
-            # Convert to storage data values
-            st_val = _convertval(val, signed, thresh, minmax)
+        # Store the signs for output
+        signsarr = np.sign(workdataarr).astype(np.int8)
 
-            # Store in the pre-sized data containers
-            signsarr[t] = np.int8(st_val[0])
-            logdataarr[t] = st_val[1]
+        # Initial framework for low-RAM vs faster implementation
+        # if lowmem:
+        # Adjusted working log values; zeroes substituted with ones
+        np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
 
-        # Ensure exhausted
-        _trynonext(dataiter, H5.LOGDATA)
+        # Threshold. Spread out the np calls for easier reading, and calculate
+        # in-place for reduced RAM usage.
+        if thresh:
+            if signed:
+                # Threshold, then absval
+                np.clip(workdataarr, *minmax, out=workdataarr)
+                np.abs(workdataarr, out=workdataarr)
+            else:
+                # Absval, then threshold
+                np.abs(workdataarr, out=workdataarr)
+                np.clip(workdataarr, *minmax, out=workdataarr)
+        else:
+            # Just absval if no thresholding
+            np.abs(workdataarr, out=workdataarr)
+
+        # Finish with log base 10
+        np.log10(workdataarr, out=workdataarr)
 
         # Store the arrays, compressed (implicitly activates auto-sized
         #  chunking)
-        hf.create_dataset(H5.LOGDATA, data=logdataarr, compression="gzip",
+        hf.create_dataset(H5.LOGDATA, data=workdataarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=trunc)
         hf.create_dataset(H5.SIGNS, data=signsarr, compression="gzip",
                           compression_opts=comp, shuffle=True, scaleoffset=0)
@@ -336,6 +308,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
 
     import h5py as h5
     import itertools as itt
+    import numpy as np
     import os
 
     # Default precision value, if no value passed on commandline
@@ -412,13 +385,15 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
             #  factor by at least two-fold.
             signs = hf[H5.SIGNS].value
             logvals = hf[H5.LOGDATA].value
+            outvals = np.multiply(signs, 10.0**logvals)
 
             # Can just run a combinatorial iterator over the dimensions
             # of the dataset
             for i, t in enumerate(itt.product(*map(range, dims))):
                 # f.write(_exp_format(hf[H5.SIGNS].value[t] *
                 #                     10.**hf[H5.LOGDATA].value[t], prec))
-                f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
+                # f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
+                f.write(_exp_format(outvals[t], prec))
 
                 # Newline to wrap at a max of six values per line, or if at
                 # the last entry of a z-iteration and at the last dataset,
