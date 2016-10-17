@@ -44,51 +44,6 @@ class TestFunctionsMisc(ut.TestCase):
         with self.subTest(type='object'):
             self.assertRaises(TypeError, _ef, ValueError(), 2)
 
-    def test_FxnMisc_ConvertVal_Good(self):
-        from h5cube.h5cube import _convertval as _cv
-        import math as m
-
-        params=[{'name': 'zero', 'val': 0.0, 's': False,
-                 't': False, 'm': None, 'ret': [0.0, 0.0]},
-                {'name': 'zeroThresh', 'val': 0.0, 's': False,
-                 't': True, 'm': [0.1, 10], 'ret': [1.0, -1.0]},
-                {'name': 'pos', 'val': 1.0/m.pi, 's': False,
-                 't': False, 'm': None, 'ret': [1.0, -0.4971495]},
-                {'name': 'neg', 'val': m.asin(-0.8), 's': False,
-                 't': False, 'm': None, 'ret': [-1.0, -0.03278198]},
-                {'name': 'posThMax', 'val': 10.0**2.5, 's': False,
-                 't': True, 'm': [0.1, 30.2], 'ret': [1.0, 1.480007]},
-                {'name': 'posThMin', 'val': 3e-3, 's': False,
-                 't': True, 'm': [0.15, 4], 'ret': [1.0, -0.8239087]},
-                {'name': 'negThMax', 'val': -3000.51, 's': False,
-                 't': True, 'm': [0.2, m.pi**3], 'ret': [-1.0, 1.4914496]},
-                {'name': 'negThMin', 'val': -3e-6, 's': False,
-                 't': True, 'm': [m.pi**-0.02, 50], 'ret': [-1.0, -0.009943]},
-                {'name': 'posSgThMax', 'val': 3, 's': True,
-                 't': True, 'm': [-30, -2.54], 'ret': [-1.0, 0.4048337]},
-                {'name': 'negSgThMin', 'val': -4, 's': True,
-                 't': True, 'm': [m.exp(-10), 8], 'ret': [1.0, -4.3429448]}]
-
-        suffix = ['_sign', '_logval']
-
-        for p in params:
-            tval = _cv(p['val'], p['s'], p['t'], p['m'])
-
-            for i, s in enumerate(suffix):
-                with self.subTest(type=p['name'] + s):
-                    self.assertAlmostEqual(tval[i], p['ret'][i], delta=1e-5)
-
-    def test_FxnMisc_ConvertVal_Bad(self):
-        from h5cube.h5cube import _convertval as _cv
-
-        with self.subTest(type='invert_minmax'):
-            self.assertRaises(ValueError, _cv, val=1, signed=False,
-                              thresh=True, minmax=[10, 0.1])
-
-        with self.subTest(type='unsigned_neg_minmax'):
-            self.assertRaises(ValueError, _cv, val=1, signed=False,
-                              thresh=True, minmax = [-1, 1])
-
     def test_FxnMisc_TryNext(self):
         from h5cube.h5cube import _trynext
 
@@ -150,32 +105,32 @@ class SuperFunctionsTest(object):
                              'grid20mo6-8': 80454},
                       'posix': {'grid20': 24041,
                                 'grid20ang': 24041,
-                                'grid25mo': 51659,
-                                'grid20mo6-8': 79154}}
+                                'grid25mo': 52428,
+                                'grid20mo6-8': 80254}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
                              'grid20ang': 17612,
                              'grid25mo': 28880,
                              'grid20mo6-8': 38011},
                       'posix': {'grid20': 17664,
                                 'grid20ang': 17664,
-                                'grid25mo': 25307,
-                                'grid20mo6-8': 34440}}
+                                'grid25mo': 28529,
+                                'grid20mo6-8': 37836}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
                                  'grid20ang': 19660,
                                  'grid25mo': 33164,
                                  'grid20mo6-8': 48846},
                           'posix': {'grid20': 18038,
                                     'grid20ang': 18038,
-                                    'grid25mo': 30667,
-                                    'grid20mo6-8': 45982}}
+                                    'grid25mo': 32919,
+                                    'grid20mo6-8': 48774}}
     sizes_si0x002f5 = {'nt': {'grid20': 17612,
                               'grid20ang': 17612,
                               'grid25mo': 25366,
                               'grid20mo6-8': 31548},
                        'posix': {'grid20': 17664,
                                  'grid20ang': 17664,
-                                 'grid25mo': 21929,
-                                 'grid20mo6-8': 27516}}
+                                 'grid25mo': 25359,
+                                 'grid20mo6-8': 31426}}
 
     # bytes filesize match window
     fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20

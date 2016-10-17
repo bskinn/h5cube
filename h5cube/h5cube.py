@@ -75,45 +75,6 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
-# def _convertval(val, signed, thresh, minmax):
-#     """ [Docstring]
-#
-#     """
-#
-#     import numpy as np
-#
-#     # Min <= Max is required. Can't imagine a use-case for equal min and max
-#     # at the moment, but may be desired by someone at some point?
-#     if thresh and minmax is not None and minmax[0] > minmax[1]:
-#         raise ValueError('min <= max is required')
-#
-#     # If using unsigned thresholding, both min and max have to be non-negative
-#     if thresh and (not signed) and minmax is not None and \
-#                                                 np.any(np.array(minmax) < 0):
-#         raise ValueError('0 <= min <= max required for unsigned thresholding')
-#
-#     # Threshold, if indicated
-#     if thresh:
-#         if signed:
-#             if val < minmax[0]:
-#                 val = minmax[0]
-#             elif val > minmax[1]:
-#                 val = minmax[1]
-#         else:
-#             if np.abs(val) < minmax[0]:
-#                 val = (np.sign(val) if val else 1.0) * minmax[0]
-#             elif np.abs(val) > minmax[1]:
-#                 val = np.sign(val) * minmax[1]
-#
-#     # Special return value for zero; otherwise calculate the separate
-#     # values for the sign of the value and the base-10 logarithm of its
-#     # absolute value.
-#     if val == 0.0:
-#         return [0.0, 0.0]
-#     else:
-#         return [np.sign(val), np.log10(np.abs(val))]
-
-
 def _trynext(iterator, msg):
     """ [Docstring]
 
@@ -245,7 +206,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
                     # Ran out of values. Pull the next line.
                     elements = iter(_trynext(datalines, H5.DSET_IDS).split())
                 except ValueError as e:
-                    # Catch a non-integer value, for the case where there \
+                    # Catch a non-integer value, for the case where there
                     # aren't enough dataset ID values and parsing
                     # erroneously moves to data values.
                     raise ValueError(
@@ -266,9 +227,7 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             hf.create_dataset(H5.NUM_DSETS, data=H5.VAL_NOT_ORBFILE)
             hf.create_dataset(H5.DSET_IDS, data=np.array([]))
 
-        # Volumetric field data
-        # Create one big iterator over a scientific notation regular
-        #  expression for the remainder of the file
+        # === VOLUMETRIC FIELD DATA ===
 
         # Regex pattern for lines of scientific notation
         p_scinot = re.compile("""
@@ -294,9 +253,13 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             minmax[0] = isofactor[0] / isofactor[1]
             minmax[1] = isofactor[0] * isofactor[1]
 
-        # Fill the working numpy object
-        workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
-                                        dataiter))).reshape(dims)
+        # Fill the working numpy object, chaining a more informative exception
+        # if the data pull fails
+        try:
+            workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
+                                            dataiter))).reshape(dims)
+        except ValueError as e:
+            raise ValueError('Error parsing volumetric data') from e
 
         # Store the signs for output
         signsarr = np.sign(workdataarr).astype(np.int8)
@@ -323,23 +286,6 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
 
         # Finish with log base 10
         np.log10(workdataarr, out=workdataarr)
-
-        # else:
-        #     # Adjusted working log values; zeroes substituted with ones
-        #     workdataarr = workdataarr + (1.0 - np.sign(np.abs(workdataarr)))
-        #
-        #     # Threshold, if indicated, and calculate log10(abs(..))
-        #     if thresh:
-        #         if signed:
-        #             # Threshold, then absval
-        #             workdataarr = np.log10(np.abs(np.clip(workdataarr, *minmax)))
-        #
-        #         else:
-        #             # Absval, then threshold
-        #             workdataarr = np.log10(np.clip(np.abs(workdataarr), *minmax))
-        #
-        #     else:
-        #         workdataarr = np.log10(np.abs(workdataarr))
 
         # Store the arrays, compressed (implicitly activates auto-sized
         #  chunking)
