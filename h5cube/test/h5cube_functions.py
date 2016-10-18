@@ -304,16 +304,19 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         fn = os.path.join(self.scrpath, "grid20.cube")
 
         # Extra confirmation that the file exists prior to processing
-        self.assertTrue(os.path.isfile(fn))
+        with self.subTest(type='exists_pre_exec'):
+            self.assertTrue(os.path.isfile(fn))
 
         # Just test the one grid20.cube for post-compress deletion
-        try:
-            cube_to_h5(fn, delsrc=True)
-        except Exception:
-            self.fail(msg="Conversion failed on '{0}'".format(fn))
+        with self.subTest(type='during_compression'):
+            try:
+                cube_to_h5(fn, delsrc=True)
+            except Exception:
+                self.fail(msg="Conversion failed on '{0}'".format(fn))
 
         # Confirm source file was deleted
-        self.assertFalse(os.path.isfile(fn))
+        with self.subTest(type='deleted_post_exec'):
+            self.assertFalse(os.path.isfile(fn))
 
     def test_FxnCubeToH5_MultiLineOrbsList(self):
         import os
@@ -561,24 +564,60 @@ class TestFunctionsH5ToCube_Good(SuperFunctionsTest, ut.TestCase):
     def tearDown(self):
         self.clear_scratch()
 
-    def test_FxnH5ToCube_Prec2(self):
-        from h5cube import h5_to_cube as htc
-        import os, re
+    @staticmethod
+    def check_prec(fn, prec, lnum):
+        import re
 
-        prec = 2
         p_prec = re.compile("-?\\d\.\\d{{{0}}}[ed]".format(prec), re.I)
 
+        with open(fn, 'r') as f:
+            lines = f.readlines()
+
+        return p_prec.search(lines[lnum]) is not None
+
+    def test_FxnH5ToCube_Prec(self):
+        from h5cube import h5_to_cube as htc
+        from h5cube import DEF
+        import os
+
+        prec_arg = [2, None]
+        prec_expect = [2, DEF.PREC]
+
         for fn in os.listdir(self.scrpath):
-            htc(self.scrfn(fn), prec=prec)
+            for pa, pe in zip(prec_arg, prec_expect):
+                # Decompress
+                htc(self.scrfn(fn), prec=pa)
 
-            with open(self.scrfn(os.path.splitext(fn)[0] + '.cube'), 'r') as f:
-                lines = f.readlines()
+                # Store the .cube filename
+                cube_fn = os.path.splitext(fn)[0] + '.cube'
 
-            with self.subTest(fn=fn):
-                self.assertIsNotNone(p_prec.search(lines[self.hdr_lines[
-                                                    os.path.splitext(fn)[0]]]),
-                                     msg="No value found with expected "
-                                         "precision")
+                # Store the line number to check
+                lnum = self.hdr_lines[os.path.splitext(fn)[0]]
+
+                with self.subTest(fn=fn, prec_arg=pa):
+                    self.assertTrue(self.check_prec(self.scrfn(cube_fn), pe, lnum),
+                                    msg="No value found with expected precision")
+
+    def test_FxnH5ToCube_Delete(self):
+        import os
+        from h5cube import h5_to_cube as htc
+
+        fn = self.scrfn("grid20.h5cube")
+
+        # Extra confirmation that the file exists prior to processing
+        with self.subTest(type='exists_pre_exec'):
+            self.assertTrue(os.path.isfile(fn))
+
+        # Just test the one grid20.cube for post-decompress deletion
+        with self.subTest(type='during_decompression'):
+            try:
+                htc(fn, delsrc=True)
+            except Exception:
+                self.fail(msg="Conversion failed on '{0}'".format(fn))
+
+        # Confirm source file was deleted
+        with self.subTest(type='deleted_post_exec'):
+            self.assertFalse(os.path.isfile(fn))
 
 
 class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
