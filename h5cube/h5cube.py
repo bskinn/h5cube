@@ -264,8 +264,6 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Store the signs for output
         signsarr = np.sign(workdataarr).astype(np.int8)
 
-        # Initial framework for low-RAM vs faster implementation
-        # if lowmem:
         # Adjusted working log values; zeroes substituted with ones
         np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
 

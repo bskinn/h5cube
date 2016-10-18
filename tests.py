@@ -28,6 +28,8 @@ class AP(object):
     FUNCTIONS_CGOOD = 'fxn_cgood'
     FUNCTIONS_CBAD = 'fxn_cbad'
     FUNCTIONS_CALL = 'fxn_call'
+    FUNCTIONS_DGOOD = 'fxn_dgood'
+    FUNCTIONS_DALL = 'fxn_dall'
     FUNCTIONS_DATA = 'fxn_data'
     FUNCTIONS_CYCLED = 'fxn_cycled'
 
@@ -71,6 +73,12 @@ def get_parser():
                          action='store_true',
                          help="Run 'error-expected' API compression "
                               "function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DGOOD),
+                         action='store_true',
+                         help="Run 'no-error' API decompression function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DALL),
+                         action='store_true',
+                         help="Run all API decompression function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CYCLED),
                          action='store_true',
                          help="Run multi-cycled API function tests")
@@ -112,25 +120,29 @@ def main():
     addsuiteif(h5cube.test.h5cube_cmdline.suite(), [AP.ALL, AP.CMDLINE])
 
     # API function tests split into groups
-    # Expected-good
-    addsuiteif(h5cube.test.h5cube_functions.suite_goodh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CGOOD])
+    # Expected-good compression
+    addsuiteif(h5cube.test.h5cube_functions.suite_goodcth(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CGOOD])
 
-    # Expected-bad
-    addsuiteif(h5cube.test.h5cube_functions.suite_badh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CBAD])
+    # Expected-bad compression
+    addsuiteif(h5cube.test.h5cube_functions.suite_badcth(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CBAD])
+
+    # Expected-good decompression
+    addsuiteif(h5cube.test.h5cube_functions.suite_goodhtc(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DALL, AP.FUNCTIONS_DGOOD])
 
     # Data validation tests
     addsuiteif(h5cube.test.h5cube_functions.suite_datacheckh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DATA])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DATA])
 
     # Cycled execution tests
     addsuiteif(h5cube.test.h5cube_functions.suite_cycledh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLED])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLED])
 
     # Misc API tests
     addsuiteif(h5cube.test.h5cube_functions.suite_misc(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_MISC])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_MISC])
 
     # Create the test runner and execute
     ttr = ut.TextTestRunner(buffer=True,

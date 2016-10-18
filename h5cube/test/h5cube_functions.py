@@ -135,6 +135,12 @@ class SuperFunctionsTest(object):
     # bytes filesize match window
     fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20
 
+    # Number of lines in the header of each file
+    hdr_lines = {'grid20': 22,
+                 'grid20ang': 22,
+                 'grid25mo': 14,
+                 'grid20mo6-8': 14}
+
     @staticmethod
     def shortsleep():
         from time import sleep
@@ -152,12 +158,12 @@ class SuperFunctionsTest(object):
         cls.clear_scratch()
 
     @classmethod
-    def copy_scratch(cls):
+    def copy_scratch(cls, ext):
         import os
         import shutil
 
         for fn in [fn for fn in os.listdir(cls.respath)
-                   if fn.endswith('.cube')]:
+                   if fn.endswith(ext)]:
             shutil.copy(os.path.join(cls.respath, fn),
                         os.path.join(cls.scrpath, fn))
 
@@ -210,7 +216,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
@@ -353,7 +359,7 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         cls.ofpath = os.path.join(cls.scrpath, 'mod.cube')
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
@@ -542,6 +548,39 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
+class TestFunctionsH5ToCube_Good(SuperFunctionsTest, ut.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
+
+    def setUp(self):
+        self.copy_scratch('.h5cube')
+
+    def tearDown(self):
+        self.clear_scratch()
+
+    def test_FxnH5ToCube_Prec2(self):
+        from h5cube import h5_to_cube as htc
+        import os, re
+
+        prec = 2
+        p_prec = re.compile("-?\\d\.\\d{{{0}}}[ed]".format(prec), re.I)
+
+        for fn in os.listdir(self.scrpath):
+            htc(self.scrfn(fn), prec=prec)
+
+            with open(self.scrfn(os.path.splitext(fn)[0] + '.cube'), 'r') as f:
+                lines = f.readlines()
+
+            with self.subTest(fn=fn):
+                self.assertIsNotNone(p_prec.search(lines[self.hdr_lines[
+                                                    os.path.splitext(fn)[0]]]),
+                                     msg="No value found with expected "
+                                         "precision")
+
+
 class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
 
     @classmethod
@@ -550,7 +589,7 @@ class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
@@ -609,7 +648,7 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
         # Copy the resource files only once, before all tests run
-        cls.copy_scratch()
+        cls.copy_scratch('.cube')
 
         # Copy the multi-MO CUBE to first temp name
         shutil.copy(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
@@ -680,10 +719,10 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
         from itertools import zip_longest as zipl
         import os
 
-        checklines = {'grid20.cube': 20,
-                      'grid20ang.cube': 20,
-                      'grid25mo.cube': 12,
-                      'grid20mo6-8.cube': 12}
+        # checklines = {'grid20.cube': 20,
+        #               'grid20ang.cube': 20,
+        #               'grid25mo.cube': 12,
+        #               'grid20mo6-8.cube': 12}
 
         for fn in [f for f in os.listdir(self.respath) if f.endswith('.cube')]:
             # Compress, rename, decompress
@@ -702,7 +741,7 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                         self.assertEqual(next(newf), next(oldf))
 
                     # Data lines
-                    for i in range(checklines[fn]):
+                    for i in range(self.hdr_lines[os.path.splitext(fn)[0]] - 2):
                         for j, t in enumerate(zipl(next(oldf).split(),
                                                    next(newf).split())):
                             with self.subTest(fn=fn, line=i, element=j):
@@ -717,7 +756,7 @@ def suite_misc():
     return s
 
 
-def suite_goodh5():
+def suite_goodcth():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Good)])
@@ -725,10 +764,18 @@ def suite_goodh5():
     return s
 
 
-def suite_badh5():
+def suite_badcth():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Bad)])
+
+    return s
+
+
+def suite_goodhtc():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsH5ToCube_Good)])
 
     return s
 
