@@ -158,12 +158,13 @@ class SuperFunctionsTest(object):
         cls.clear_scratch()
 
     @classmethod
-    def copy_scratch(cls, ext):
+    def copy_scratch(cls, ext, *, exclude=()):
         import os
         import shutil
 
         for fn in [fn for fn in os.listdir(cls.respath)
-                   if fn.endswith(ext)]:
+                   if fn.endswith(ext)
+                   and not os.path.splitext(fn)[0] in exclude]:
             shutil.copy(os.path.join(cls.respath, fn),
                         os.path.join(cls.scrpath, fn))
 

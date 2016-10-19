@@ -701,7 +701,7 @@ def main():
         return (EXIT.CMDLINE, "Error: File extension not recognized.")
 
 
-def script_run():
+def script_run():   # pragma: no cover
     # Run program
     out = main()
 
@@ -712,6 +712,6 @@ def script_run():
     # Exit with whatever code
     sys.exit(out[0])
 
-if __name__ == '__main__':
+if __name__ == '__main__':   # pragma: no cover
     script_run()
 
