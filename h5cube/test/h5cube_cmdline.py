@@ -58,7 +58,9 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
 
         # Arguments
         argsdict = {'noargs': ['h5cube.py', self.scrfn('grid20.cube')],
-                    'delsrc': ['h5cube.py', self.scrfn('grid20.cube'), '-d']}
+                    'delsrc': ['h5cube.py', self.scrfn('grid20.cube'), '-d'],
+                    'comp5': ['h5cube.py', self.scrfn('grid20.cube'),
+                              '-c', '5']}
 
         # Return values
         retsdict = {'noargs': {'cubepath': self.scrfn('grid20.cube'),
@@ -66,19 +68,27 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
                                'thresh': False, 'delsrc': False},
                     'delsrc': {'cubepath': self.scrfn('grid20.cube'),
                                'comp': None, 'trunc': None,
-                               'thresh': False, 'delsrc': True}}
+                               'thresh': False, 'delsrc': True},
+                    'comp5': {'cubepath': self.scrfn('grid20.cube'),
+                              'comp': 5, 'trunc': None,
+                              'thresh': False, 'delsrc': False}}
 
         for name in argsdict:
+            # Spoof argv
+            sys.argv = argsdict[name]
+
+            # Call the commandline main function
+            h5cube_main()
+
+            # Store the kwargs passed; this relies on the cube_to_h5 code
+            # being called in keyword-arg style by the _run_fxn_errcatch
+            # function.
+            kwargs = cth_mock.call_args[1]
+
             with self.subTest(name=name):
-
-                # Spoof argv
-                sys.argv = argsdict[name]
-
-                # Call the commandline main function
-                h5cube_main()
-
-                # Test the output
-                cth_mock.assert_called_with(**retsdict[name])
+                # Test the args
+                self.assertEqual(kwargs, retsdict[name])
+                # cth_mock.assert_called_with(**retsdict[name])
 
 
 
