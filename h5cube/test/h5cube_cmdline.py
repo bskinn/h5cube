@@ -39,8 +39,7 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
     def setUpClass(cls):
         cls.longMessage = True
         cls.ensure_scratch_dir()
-        cls.copy_scratch('.cube', exclude=('grid25mo', 'grid20ang',
-                                           'grid20mo6-8'))
+        cls.copy_scratch('.cube', include=('grid20',))
 
     def setUp(self):
         self.store_args()
@@ -54,28 +53,44 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
 
     def test_CmdlineCompress(self, cth_mock):
         from h5cube.h5cube import main as h5cube_main
+        import numpy as np
         import sys
 
         # Arguments
-        argsdict = {'noargs': ['h5cube.py', self.scrfn('grid20.cube')],
-                    'delsrc': ['h5cube.py', self.scrfn('grid20.cube'), '-d'],
-                    'comp5': ['h5cube.py', self.scrfn('grid20.cube'),
-                              '-c', '5']}
+        scrfname = self.scrfn('grid20.cube')
+        baseargs = ['h5cube.py', scrfname]
+        argsdict = {'noargs': [],
+                    'nothresh': ['-n'],
+                    'delsrc': ['-d'],
+                    'comp5': ['-c', '5'],
+                    'trunc3': ['-t', '3'],
+                    'minmax': ['-m', '1e-5', '10']}
 
         # Return values
-        retsdict = {'noargs': {'cubepath': self.scrfn('grid20.cube'),
+        retsdict = {'noargs': {'cubepath': scrfname,
                                'comp': None, 'trunc': None,
                                'thresh': False, 'delsrc': False},
-                    'delsrc': {'cubepath': self.scrfn('grid20.cube'),
+                    'nothresh': {'cubepath': scrfname,
+                               'comp': None, 'trunc': None,
+                               'thresh': False, 'delsrc': False},
+                    'delsrc': {'cubepath': scrfname,
                                'comp': None, 'trunc': None,
                                'thresh': False, 'delsrc': True},
-                    'comp5': {'cubepath': self.scrfn('grid20.cube'),
+                    'comp5': {'cubepath': scrfname,
                               'comp': 5, 'trunc': None,
-                              'thresh': False, 'delsrc': False}}
+                              'thresh': False, 'delsrc': False},
+                    'trunc3': {'cubepath': scrfname,
+                               'comp': None, 'trunc': 3,
+                               'thresh': False, 'delsrc': False},
+                    'minmax': {'cubepath': scrfname,
+                               'comp': None, 'trunc': None,
+                               'thresh': True, 'delsrc' : False,
+                               'signed': False,
+                               'minmax': np.array([1e-5, 10])}}
 
         for name in argsdict:
             # Spoof argv
-            sys.argv = argsdict[name]
+            sys.argv = baseargs + argsdict[name]
 
             # Call the commandline main function
             h5cube_main()
@@ -85,11 +100,17 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
             # function.
             kwargs = cth_mock.call_args[1]
 
-            with self.subTest(name=name):
-                # Test the args
-                self.assertEqual(kwargs, retsdict[name])
-                # cth_mock.assert_called_with(**retsdict[name])
+            # Test identical keysets (symmetric difference is the empty set)
+            with self.subTest(name=name + "_argmatch"):
+                self.assertTrue(set(kwargs.keys()).symmetric_difference(
+                                set(retsdict[name].keys())) == set())
 
+            # Test each arg in the dicts
+            for k in kwargs.keys():
+                with self.subTest(name=name + '_' + k):
+                    # Test the args
+                    self.assertTrue(self.robust_equal(kwargs[k],
+                                                      retsdict[name][k]))
 
 
 def suite_cmdline_good():

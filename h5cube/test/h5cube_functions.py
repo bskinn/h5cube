@@ -158,12 +158,13 @@ class SuperFunctionsTest(object):
         cls.clear_scratch()
 
     @classmethod
-    def copy_scratch(cls, ext, *, exclude=()):
+    def copy_scratch(cls, ext, *, include=(), exclude=()):
         import os
         import shutil
 
         for fn in [fn for fn in os.listdir(cls.respath)
                    if fn.endswith(ext)
+                   and (not include or os.path.splitext(fn)[0] in include)
                    and not os.path.splitext(fn)[0] in exclude]:
             shutil.copy(os.path.join(cls.respath, fn),
                         os.path.join(cls.scrpath, fn))
@@ -207,6 +208,20 @@ class SuperFunctionsTest(object):
     def scrfn(cls, fn):
         import os
         return os.path.join(cls.scrpath, fn)
+
+    # Helper test method for things that could be ndarrays
+    @staticmethod
+    def robust_equal(v1, v2):
+        try:
+            # If it has a shape member, assume it's an ndarray
+            v1.shape + v2.shape
+        except AttributeError:
+            # Probably not ndarray, just compare values. Will blow up if
+            # one is ndarray and the other isn't
+            return v1 == v2
+        else:
+            # Probably is ndarray. Want same shape and identical values
+            return v1.shape == v2.shape and (v1 == v2).all()
 
 
 class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
@@ -758,11 +773,6 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
         from h5cube import h5_to_cube as htc
         from itertools import zip_longest as zipl
         import os
-
-        # checklines = {'grid20.cube': 20,
-        #               'grid20ang.cube': 20,
-        #               'grid25mo.cube': 12,
-        #               'grid20mo6-8.cube': 12}
 
         for fn in [f for f in os.listdir(self.respath) if f.endswith('.cube')]:
             # Compress, rename, decompress
