@@ -66,10 +66,12 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
                     'trunc3': ['-t', '3'],
                     'minmax': ['-m', '1e-5', '10'],
                     'ifac': ['-i', '0.002', '5'],
-                    'mmax_s': ['-m', '-2e-2', '3e-1', '-s']}
-
-            # ADD TESTS FOR PERMUTATIONS OF NEGATIVE VALUES IN SCIENTIFIC
-            # NOTATION
+                    'ifac_s': ['-i', '-3e-2', '10', '-s'],
+                    'mmax_s_nodec': ['-m', '-2e-2', '3e-1', '-s'],
+                    'mmax_s_decnodig': ['-m', '-2.e-2', '3.e-1', '-s'],
+                    'mmax_s_nodigdec': ['-m', '-.2e-1', '.3e0', '-s'],
+                    'mmax_s_multidigdec': ['-m', '-200e-4', '30e-2', '-s'],
+                    'mmax_s_cap_e': ['-m', '-2E-2', '3E-1', '-s']}
 
         # Return values
         retsdict = {'noargs': {'cubepath': scrfname,
@@ -97,13 +99,25 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
                              'thresh': True, 'delsrc': False,
                              'signed': False,
                              'isofactor': np.array([0.002, 5.0])},
-                    'mmax_s': {'cubepath': scrfname,
+                    'ifac_s': {'cubepath': scrfname,
                                'comp': None, 'trunc': None,
                                'thresh': True, 'delsrc': False,
                                'signed': True,
-                               'minmax': np.array([-2e-2, 3e-1])}}
+                               'isofactor': np.array([-0.03, 10.0])},
+                    'mmax_s_nodec': {'cubepath': scrfname,
+                                     'comp': None, 'trunc': None,
+                                     'thresh': True, 'delsrc': False,
+                                     'signed': True,
+                                     'minmax': np.array([-2e-2, 3e-1])}}
 
-        for name in argsdict:
+        # Duplicate the mmax_s values to the other keys
+        for k in [_ for _ in set(argsdict)
+                  .symmetric_difference(set(retsdict.keys()))
+                  if _.startswith('mmax_s_')]:
+            retsdict.update({k: retsdict['mmax_s_nodec']})
+
+        # Check each set of cmdline conditions
+        for name in argsdict.keys():
             # Spoof argv
             sys.argv = baseargs + argsdict[name]
 
@@ -118,14 +132,17 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
             # Test identical keysets (symmetric difference is the empty set)
             with self.subTest(name=name + "_argmatch"):
                 self.assertTrue(set(kwargs.keys()).symmetric_difference(
-                                set(retsdict[name].keys())) == set())
+                                set(retsdict[name].keys())) == set(),
+                                msg="Keyset mismatch in '{0}'".format(name))
 
             # Test each arg in the dicts
             for k in kwargs.keys():
-                with self.subTest(name=name + '_' + k):
+                with self.subTest(name=name + '__' + k):
                     # Test the args
                     self.assertTrue(self.robust_equal(kwargs[k],
-                                                      retsdict[name][k]))
+                                                      retsdict[name][k]),
+                                    msg="Mismatch in '{0}' at key '{1}'"
+                                        .format(name, k))
 
 
 def suite_cmdline_good():

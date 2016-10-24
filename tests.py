@@ -53,10 +53,12 @@ def get_parser():
                      help="Show verbose output")
 
     # Groups without subgroups
-    gp_global.add_argument(AP.PFX.format(AP.ALL),
+    gp_global.add_argument(AP.PFX.format(AP.ALL), '-a',
                      action='store_true',
                      help="Run all tests (overrides any other selections)")
-    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE),
+
+    # Command line tests
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE), '-c',
                      action='store_true',
                      help="Run all tests of commandline interface")
     gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE_GOOD),
@@ -64,7 +66,7 @@ def get_parser():
                      help="Run 'no-error' commandline tests")
 
     # API function tests
-    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS),
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS), '-f',
                      action='store_true',
                      help="Run all API function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CALL),
@@ -77,12 +79,12 @@ def get_parser():
                          action='store_true',
                          help="Run 'error-expected' API compression "
                               "function tests")
-    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DGOOD),
-                         action='store_true',
-                         help="Run 'no-error' API decompression function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DALL),
                          action='store_true',
                          help="Run all API decompression function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DGOOD),
+                         action='store_true',
+                         help="Run 'no-error' API decompression function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CYCLED),
                          action='store_true',
                          help="Run multi-cycled API function tests")
