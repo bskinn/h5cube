@@ -590,6 +590,17 @@ def _get_parser():
     return prs
 
 
+def _tweak_neg_scinot():
+    """ [Docstring]
+
+    Modification of http://stackoverflow.com/a/21446783/4376000
+
+    """
+    import re
+    p = re.compile('-\\d*\\.?\\d*e', re.I)
+    sys.argv = [' ' + a if p.match(a) else a for a in sys.argv]
+
+
 def main():
 
     import numpy as np
@@ -597,6 +608,10 @@ def main():
 
     # Retrieve the argument parser
     prs = _get_parser()
+
+    # Preprocess the arguments to avoid confusing argparse with any
+    # negative values in scientific notation.
+    _tweak_neg_scinot()
 
     # Parse known args, convert to dict, and leave unknown args in sys.argv
     ns, args_left = prs.parse_known_args()

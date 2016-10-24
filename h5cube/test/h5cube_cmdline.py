@@ -64,7 +64,12 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
                     'delsrc': ['-d'],
                     'comp5': ['-c', '5'],
                     'trunc3': ['-t', '3'],
-                    'minmax': ['-m', '1e-5', '10']}
+                    'minmax': ['-m', '1e-5', '10'],
+                    'ifac': ['-i', '0.002', '5'],
+                    'mmax_s': ['-m', '-2e-2', '3e-1', '-s']}
+
+            # ADD TESTS FOR PERMUTATIONS OF NEGATIVE VALUES IN SCIENTIFIC
+            # NOTATION
 
         # Return values
         retsdict = {'noargs': {'cubepath': scrfname,
@@ -86,7 +91,17 @@ class TestCmdlineCompressGood(SuperFunctionsTest, SuperCmdlineTest,
                                'comp': None, 'trunc': None,
                                'thresh': True, 'delsrc' : False,
                                'signed': False,
-                               'minmax': np.array([1e-5, 10])}}
+                               'minmax': np.array([1e-5, 10])},
+                    'ifac': {'cubepath': scrfname,
+                             'comp': None, 'trunc': None,
+                             'thresh': True, 'delsrc': False,
+                             'signed': False,
+                             'isofactor': np.array([0.002, 5.0])},
+                    'mmax_s': {'cubepath': scrfname,
+                               'comp': None, 'trunc': None,
+                               'thresh': True, 'delsrc': False,
+                               'signed': True,
+                               'minmax': np.array([-2e-2, 3e-1])}}
 
         for name in argsdict:
             # Spoof argv
