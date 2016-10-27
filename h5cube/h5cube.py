@@ -614,9 +614,8 @@ def main():
     _tweak_neg_scinot()
 
     # Parse known args, convert to dict, and leave unknown args in sys.argv
-    ns, args_left = prs.parse_known_args()
+    ns = prs.parse_args()
     params = vars(ns)
-    sys.argv = sys.argv[:1] + args_left
 
     # Retrieve path and file extension
     path = params[AP.PATH]

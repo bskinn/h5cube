@@ -234,6 +234,19 @@ class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
     def tearDownClass(cls):
         cls.clear_scratch()
 
+    def run_nonparser_tests(self, ba, ad, rc):
+        from h5cube.h5cube import main as h5cube_main
+        import sys
+
+        for name in ad:
+            with self.subTest(name=name):
+                # Spoof argv
+                sys.argv = ba + ad[name]
+
+                # Assert on the return code
+                self.assertEqual(h5cube_main()[0], rc)
+
+
     def test_CmdlineParser(self, cth_mock, htc_mock):
         """ Tests of invalid cmdline input to be caught by argparse """
         from h5cube.h5cube import main as h5cube_main
@@ -244,6 +257,8 @@ class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
         scrfname = self.scrfn('grid20.cube')
         baseargs = ['h5cube.py']
         argsdict = {'nofile': [],
+                    'mult_posargs': [scrfname, 'abcde'],
+                    'unk_optarg': [scrfname, '-q'],
                     'abs_signed': [scrfname, '-a', '-s'],
                     'abs_nothresh': [scrfname, '-a', '-n'],
                     'signed_nothresh': [scrfname, '-s', '-n'],
@@ -272,28 +287,46 @@ class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
 
     def test_CmdlineNonParserCMDLINE(self, cth_mock, htc_mock):
         """ Tests of invalid cmdline input not catchable by argparse """
-        from h5cube.h5cube import main as h5cube_main
         from h5cube import EXIT
-        import sys
+        import shutil
 
-        # Arguments
+        # Filenames & copying to 'no-good' extension
         scrcube = self.scrfn('grid20.cube')
         scrh5 = self.scrfn('grid20.h5cube')
+        scrtxt = self.scrfn('test.txt')
+        shutil.copy(scrcube, scrtxt)
+
+        # Arguments
         baseargs = ['h5cube.py']
         argsdict = {'nothresh_minmax': [scrcube, '-n', '-m', '1e-4', '10'],
                     'nothresh_isofac': [scrcube, '-n', '-i', '0.002', '4'],
                     'comp_decomp': [scrcube, '-t', '5', '-p', '5'],
                     'mmax_wrong_order': [scrcube, '-m', '5', '2'],
-                    'mmax_neg_min_in_abs': [scrcube, '-m', '-3', '5']}
+                    'mmax_neg_min_in_abs': [scrcube, '-m', '-3', '5'],
+                    'isof_zero_isovalue': [scrcube, '-i', '0.0', '5'],
+                    'isof_fac_leq_one': [scrcube, '-i', '2e-3', '0.85'],
+                    'isof_neg_iso_abs_mode': [scrcube, '-a', '-i', '-1e-2', '10'],
+                    'abs_mode_no_vals': [scrcube, '-a'],
+                    'sign_mode_no_vals': [scrcube, '-s'],
+                    'comp_opt_to_h5': [scrh5, '-t', '4'],
+                    'decomp_opt_to_cube': [scrcube, '-p', '6'],
+                    'unk_file_ext': [scrtxt]}
 
         # Run tests, expecting an EXIT.CMDLINE exit code
-        for name in argsdict:
-            with self.subTest(name=name):
-                # Spoof argv
-                sys.argv = baseargs + argsdict[name]
+        self.run_nonparser_tests(baseargs, argsdict, EXIT.CMDLINE)
 
-                # Assert on the return code
-                self.assertEqual(h5cube_main()[0], EXIT.CMDLINE)
+
+    def test_CmdlineNonParserFILEREAD(self, cth_mock, htc_mock):
+        """ Tests of file read errors not catchable by argparse """
+        from h5cube import EXIT
+
+        # Arguments
+        baseargs = ['h5cube.py']
+        argsdict = {'file_not_exist': ['notafile.cube']}
+
+        # Run tests, expecting an EXIT.FILEREAD exit code
+        self.run_nonparser_tests(baseargs, argsdict, EXIT.FILEREAD)
+
 
     def test_CmdlineNonParserInternalException(self, cth_mock, htc_mock):
         """ For when an error is thrown inside one of the API functions """
