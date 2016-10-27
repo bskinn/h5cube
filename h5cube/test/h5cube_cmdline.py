@@ -103,8 +103,8 @@ class TestCmdlineCompressGood(SuperCmdlineTest, ut.TestCase):
         cls.clear_scratch()
 
     def test_CmdlineCompress(self, cth_mock):
+        """ Mocked tests of 'success expected' compression operations """
         import numpy as np
-        import sys
 
         # Arguments
         scrfname = self.scrfn('grid20.cube')
@@ -189,6 +189,7 @@ class TestCmdlineDecompressGood(SuperCmdlineTest, ut.TestCase):
         cls.clear_scratch()
 
     def test_CmdlineDecompress(self, htc_mock):
+        """ Mocked tests of 'success expected' decompression operations """
         from h5cube.h5cube import main as h5cube_main
         import numpy as np
         import sys
@@ -212,11 +213,128 @@ class TestCmdlineDecompressGood(SuperCmdlineTest, ut.TestCase):
         self.good_test(baseargs, argsdict, kwdict, htc_mock)
 
 
+# Patch both so that they don't accidentally run.
+@utm.patch('h5cube.h5cube.h5_to_cube')
+@utm.patch('h5cube.h5cube.cube_to_h5')
+class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
+        cls.copy_scratch('.cube', include=('grid20',))
+        cls.copy_scratch('.h5cube', include=('grid20',))
+
+    def setUp(self):
+        self.store_args()
+
+    def tearDown(self):
+        self.restore_args()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.clear_scratch()
+
+    def test_CmdlineParser(self, cth_mock, htc_mock):
+        """ Tests of invalid cmdline input to be caught by argparse """
+        from h5cube.h5cube import main as h5cube_main
+        from h5cube import EXIT
+        import sys
+
+        # Arguments
+        scrfname = self.scrfn('grid20.cube')
+        baseargs = ['h5cube.py']
+        argsdict = {'nofile': [],
+                    'abs_signed': [scrfname, '-a', '-s'],
+                    'abs_nothresh': [scrfname, '-a', '-n'],
+                    'signed_nothresh': [scrfname, '-s', '-n'],
+                    'comp_noval': [scrfname, '-c'],
+                    'trunc_noval': [scrfname, '-t'],
+                    'minmax_1val': [scrfname, '-m', '0.02'],
+                    'isofac_1val': [scrfname, '-i', '0.002'],
+                    'prec_noval': [scrfname, '-p'],
+                    'mmax_and_isoval': [scrfname, '-m', '1e-5', '10',
+                                        '-i', '0.002', '4']}
+
+        # Run tests, expecting SystemExit
+        for name in argsdict:
+            with self.subTest(name=name):
+                # Spoof argv
+                sys.argv = baseargs + argsdict[name]
+
+                # Call main(), expecting a SystemExit
+                with self.assertRaises(SystemExit):
+                    try:
+                        h5cube_main()
+                    except SystemExit as se:
+                        # Catch, to check the exit code, then re-raise
+                        self.assertEqual(EXIT.CMDLINE, se.code)
+                        raise
+
+    def test_CmdlineNonParserCMDLINE(self, cth_mock, htc_mock):
+        """ Tests of invalid cmdline input not catchable by argparse """
+        from h5cube.h5cube import main as h5cube_main
+        from h5cube import EXIT
+        import sys
+
+        # Arguments
+        scrcube = self.scrfn('grid20.cube')
+        scrh5 = self.scrfn('grid20.h5cube')
+        baseargs = ['h5cube.py']
+        argsdict = {'nothresh_minmax': [scrcube, '-n', '-m', '1e-4', '10'],
+                    'nothresh_isofac': [scrcube, '-n', '-i', '0.002', '4'],
+                    'comp_decomp': [scrcube, '-t', '5', '-p', '5'],
+                    'mmax_wrong_order': [scrcube, '-m', '5', '2'],
+                    'mmax_neg_min_in_abs': [scrcube, '-m', '-3', '5']}
+
+        # Run tests, expecting an EXIT.CMDLINE exit code
+        for name in argsdict:
+            with self.subTest(name=name):
+                # Spoof argv
+                sys.argv = baseargs + argsdict[name]
+
+                # Assert on the return code
+                self.assertEqual(h5cube_main()[0], EXIT.CMDLINE)
+
+    def test_CmdlineNonParserInternalException(self, cth_mock, htc_mock):
+        """ For when an error is thrown inside one of the API functions """
+
+        from h5cube.h5cube import main as h5cube_main
+        from h5cube import EXIT
+        import sys
+
+        # Spoof argv
+        sys.argv = ['h5cube.py', self.scrfn('grid20.cube')]
+
+        # Add a ValueError as a side-effect to the cth mock (has to be a
+        # ValueError since that's what all of the data errors inside cth and htc
+        # are thrown as)
+        cth_mock.side_effect = ValueError("Dummy Exception")
+
+        # Exit code should be a generic error for how the cth and htc
+        # functions are currently set up.
+        self.assertEqual(h5cube_main()[0], EXIT.GENERIC)
+
+    def test_CmdlineErrorFormatter(self, cth_mock, htc_mock):
+        """ Auxiliary test, to be sure the error formatter function works """
+
+        from h5cube.h5cube import _error_format as _ef
+
+        self.assertEqual(_ef(ValueError("abcd")), "ValueError: abcd")
+
+
 def suite_cmdline_good():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestCmdlineCompressGood),
                 tl.loadTestsFromTestCase(TestCmdlineDecompressGood)])
+
+    return s
+
+
+def suite_cmdline_bad():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestCmdlineBad)])
 
     return s
 

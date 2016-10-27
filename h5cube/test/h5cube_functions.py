@@ -24,6 +24,7 @@ class TestFunctionsMisc(ut.TestCase):
         cls.longMessage = True
 
     def test_FxnMisc_ExpFormat_Good(self):
+        """ Validate correct scientific notation formatting for decompression """
         from h5cube.h5cube import _exp_format as _ef
 
         with self.subTest(type='typical'):
@@ -36,6 +37,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertEqual(_ef(2.853 * 3.122e-123, 6), "  8.907066E-123")
 
     def test_FxnMisc_ExpFormat_Bad(self):
+        """ Confirm _exp_format breaks when bad arguments are passed """
         from h5cube.h5cube import _exp_format as _ef
 
         with self.subTest(type='string'):
@@ -45,6 +47,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertRaises(TypeError, _ef, ValueError(), 2)
 
     def test_FxnMisc_TryNext(self):
+        """ Confirm _trynext works as expected """
         from h5cube.h5cube import _trynext
 
         with self.subTest(type='not_exhausted'):
@@ -60,6 +63,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertRaises(ValueError, _trynext, i, msg='Testing')
 
     def test_FxnMisc_TryNoNext(self):
+        """ Confirm _trynonext works as expected """
         from h5cube.h5cube import _trynonext
 
         with self.subTest(type='not_exhausted'):
@@ -335,6 +339,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
             self.assertFalse(os.path.isfile(fn))
 
     def test_FxnCubeToH5_MultiLineOrbsList(self):
+        """ Check that a multi-line orbital ID list compresses properly """
         import os
 
         # Filenames
@@ -422,6 +427,7 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
     def test_FxnCubeToH5_StubNumatomsOriginLine(self):
+        """ Ensure ValueError thrown if natoms/origin line is truncated """
         from h5cube import cube_to_h5
 
         # Stubify the numatoms line
@@ -650,6 +656,7 @@ class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
         self.clear_scratch()
 
     def test_FxnCycled_2xCycle(self):
+        """ Confirm no errors emerge on cycled compression/decompression """
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
         import os
@@ -763,12 +770,14 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                                          hf2.get(key).value).all())
 
     def test_FxnDataCheck_H5_Unified_Check(self):
+        """ Confirm data consistency between a compressed and a re-compressed .h5cube """
         for key in [k for k in vars(self.H5)
                     if k == k.upper() and k == getattr(self.H5, k)]:
             with self.subTest(key=key):
                 self.do_h5py_test(key)
 
     def test_FxnDataCheck_Cube_Header_Check(self):
+        """ Confirm original and cycled .cubes have headers that parse to identical content """
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
         from itertools import zip_longest as zipl

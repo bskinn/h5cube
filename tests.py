@@ -24,6 +24,7 @@ class AP(object):
     ALL = 'all'
     CMDLINE = 'cl_all'
     CMDLINE_GOOD = 'cl_good'
+    CMDLINE_BAD = 'cl_bad'
     FUNCTIONS = 'fxn_all'
     FUNCTIONS_MISC = 'fxn_misc'
     FUNCTIONS_CGOOD = 'fxn_cgood'
@@ -64,6 +65,9 @@ def get_parser():
     gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE_GOOD),
                      action='store_true',
                      help="Run 'no-error' commandline tests")
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE_BAD),
+                     action='store_true',
+                     help="Run 'error-expected' commandline tests")
 
     # API function tests
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS), '-f',
@@ -122,9 +126,14 @@ def main():
         if any(params[k] for k in flags):
             ts.addTest(suite)
 
-    # All commandline tests in one group for now
+    # Commandline tests per-group
+    # 'Expect-good' group
     addsuiteif(h5cube.test.h5cube_cmdline.suite_cmdline_good(),
                [AP.ALL, AP.CMDLINE, AP.CMDLINE_GOOD])
+
+    # 'Expect-fail' group
+    addsuiteif(h5cube.test.h5cube_cmdline.suite_cmdline_bad(),
+               [AP.ALL, AP.CMDLINE, AP.CMDLINE_BAD])
 
     # API function tests split into groups
     # Expected-good compression

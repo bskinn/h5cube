@@ -590,7 +590,7 @@ def _get_parser():
     return prs
 
 
-def _tweak_neg_scinot():
+def _tweak_neg_scinot(): # pragma: no cover
     """ [Docstring]
 
     Modification of http://stackoverflow.com/a/21446783/4376000
