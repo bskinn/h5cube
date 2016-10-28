@@ -1,6 +1,10 @@
 from setuptools import setup
 from os import environ
 
+def readme():
+    with open('README.rst') as f:
+        return f.read()
+
 setup(
     name='h5cube',
     version='0.2',
@@ -12,6 +16,7 @@ setup(
     author='Brian Skinn',
     author_email='bskinn@alum.mit.edu',
     description='Gaussian CUBE File Compression Utility',
+    long_description=readme(),
     classifiers=['License :: OSI Approved :: MIT License',
                  'Natural Language :: English',
                  'Environment :: Console',
