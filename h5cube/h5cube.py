@@ -14,6 +14,8 @@
 #
 # ------------------------------------------------------------------------------
 
+# Global imports
+import sys
 
 # Argparse constants
 class AP(object):
@@ -264,8 +266,6 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Store the signs for output
         signsarr = np.sign(workdataarr).astype(np.int8)
 
-        # Initial framework for low-RAM vs faster implementation
-        # if lowmem:
         # Adjusted working log values; zeroes substituted with ones
         np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
 
@@ -399,7 +399,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
                 # the last entry of a z-iteration and at the last dataset,
                 # for orbital files.
                 if i % 6 == 5 or (t[2] == dims[2] - 1 and
-                                  t[-1] == dims[-1] -1):
+                                  t[-1] == dims[-1] - 1):
                     f.write('\n')
 
             # Always newlines at end
@@ -409,20 +409,20 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
     if delsrc:
         os.remove(h5path)
 
+
 def _validate_minmax(minmax, signed):
     """ [Docstring]
 
     """
 
-    import sys
-
     if minmax[0] >= minmax[1]:
-        print("Error: 'max' is not greater than 'min'")
-        sys.exit(EXIT.CMDLINE)
+        return (False, "Error: 'max' is not greater than 'min'")
 
     if not signed and minmax[0] < 0:
-        print("Error: Negative 'min' in absolute thresholding mode")
-        sys.exit(EXIT.CMDLINE)
+        return (False, "Error: Negative 'min' in absolute "
+                       "thresholding mode")
+
+    return (True, "")
 
 
 def _validate_isofactor(isofactor, signed):
@@ -430,20 +430,37 @@ def _validate_isofactor(isofactor, signed):
 
     """
 
-    import argparse as ap
-    import sys
-
     if isofactor[0] == 0.0:
-        print("Error: 'isovalue' cannot be zero")
-        sys.exit(EXIT.CMDLINE)
+        return (False, "Error: 'isovalue' cannot be zero")
 
     if isofactor[1] <= 1.0:
-        print("Error: 'factor' must be greater than one")
-        sys.exit(EXIT.CMDLINE)
+        return (False, "Error: 'factor' must be greater than one")
 
     if not signed and isofactor[0] < 0:
-        print("Error: Negative 'isovalue' in absolute thresholding mode")
-        sys.exit(EXIT.CMDLINE)
+        return (False, "Error: Negative 'isovalue' in absolute "
+                       "thresholding mode")
+
+    return (True, "")
+
+
+def _error_format(e):
+    """ [Docstring]
+
+    """
+
+    import re
+    name = re.compile("'([^']+)'").search(str(e.__class__)).group(1)
+    return "{0}: {1}".format(name, " - ".join(e.args))
+
+
+def _run_fxn_errcatch(fxn, **kwargs):
+
+    try:
+        fxn(**kwargs)
+    except Exception as e:
+        return (EXIT.GENERIC, _error_format(e))
+    else:
+        return (EXIT.OK, "")
 
 
 def _get_parser():
@@ -573,20 +590,32 @@ def _get_parser():
     return prs
 
 
+def _tweak_neg_scinot(): # pragma: no cover
+    """ [Docstring]
+
+    Modification of http://stackoverflow.com/a/21446783/4376000
+
+    """
+    import re
+    p = re.compile('-\\d*\\.?\\d*e', re.I)
+    sys.argv = [' ' + a if p.match(a) else a for a in sys.argv]
+
+
 def main():
 
-    import argparse as ap
     import numpy as np
     import os
-    import sys
 
     # Retrieve the argument parser
     prs = _get_parser()
 
+    # Preprocess the arguments to avoid confusing argparse with any
+    # negative values in scientific notation.
+    _tweak_neg_scinot()
+
     # Parse known args, convert to dict, and leave unknown args in sys.argv
-    ns, args_left = prs.parse_known_args()
+    ns = prs.parse_args()
     params = vars(ns)
-    sys.argv = sys.argv[:1] + args_left
 
     # Retrieve path and file extension
     path = params[AP.PATH]
@@ -594,8 +623,7 @@ def main():
 
     # Check for existence
     if not os.path.isfile(path):
-        print("File not found. Exiting...")
-        sys.exit(EXIT.FILEREAD)
+        return (EXIT.FILEREAD, "Error: File not found.")
 
     # Retrieve other parameters
     delsrc = params[AP.DELETE]
@@ -609,74 +637,95 @@ def main():
     isofactor = params[AP.ISOFACTOR]
 
     # Composite indicators for which types of arguments passed
-    def notNoneFalse(x):
+    def not_none_or_false(x):
+        # Want False return ONLY if x *is* None or x *is* False.
+        # Numerical 'falsey' values in particular should lead to
+        # a True return.
         return x is not None and x is not False
 
-    compargs = any(map(notNoneFalse, [comp, trunc, absolute,
-                                      signed, nothresh,
-                                      minmax, isofactor]))
+    compargs = any(map(not_none_or_false, [comp, trunc, absolute,
+                                           signed, nothresh,
+                                           minmax, isofactor]))
 
-    decompargs = any(map(notNoneFalse, [prec]))
+    decompargs = any(map(not_none_or_false, [prec]))
 
     # Complain if nothresh specified but minmax or isofactor provided
     if nothresh and not (minmax is None and isofactor is None):
-        print("Error: Thresholding parameter specified with --nothresh")
-        sys.exit(EXIT.CMDLINE)
+        return (EXIT.CMDLINE, "Error: Thresholding parameter specified"
+                              "with --nothresh")
 
     # Complain if compression and decompression arguments mixed
     if compargs and decompargs:
-        print("Error: Both compression and decompression options specified")
-        sys.exit(EXIT.CMDLINE)
+        return (EXIT.CMDLINE, "Error: Both compression and decompression"
+                              "options specified")
 
     # Convert and validate the thresholding inputs
     if minmax is not None:
         minmax = np.float_(minmax)
-        _validate_minmax(minmax, signed)
+        out = _validate_minmax(minmax, signed)
+        if not out[0]:
+            return (EXIT.CMDLINE, out[1])
+
     if isofactor is not None:
         isofactor = np.float_(isofactor)
-        _validate_isofactor(isofactor, signed)
+        out = _validate_isofactor(isofactor, signed)
+        if not out[0]:
+            return (EXIT.CMDLINE, out[1])
 
     # Complain if a thresholding mode is indicated but no
     # threshold values are provided
     if (absolute or signed) and (minmax is None and isofactor is None):
-        print("Error: Thresholding mode specified but no values provided")
-        sys.exit(EXIT.CMDLINE)
+        return (EXIT.CMDLINE, "Error: Thresholding mode specified but"
+                              "no values provided")
 
     # Check file extension as indication of execution mode
     if ext.lower() == '.h5cube':
         # Decompression mode
         if compargs:
-            print("Error: compression arguments passed to "
-                  "decompression operation")
-            sys.exit(EXIT.CMDLINE)
+            return (EXIT.CMDLINE, "Error: compression arguments passed to "
+                                  "decompression operation")
 
-        h5_to_cube(path, delsrc=delsrc, prec=prec)
+        return _run_fxn_errcatch(h5_to_cube, h5path=path, delsrc=delsrc,
+                                 prec=prec)
 
     elif ext.lower() in ['.cube', '.cub']:
         # Compression mode
         if decompargs:
-            print("Error: decompression arguments passed to "
-                  "compression operation")
-            sys.exit(EXIT.CMDLINE)
+            return (EXIT.CMDLINE, "Error: decompression arguments passed to "
+                                 "compression operation")
 
         if minmax is not None:
             # Min/max thresholding
-            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc,
-                       thresh=True, signed=signed, minmax=minmax)
+            return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
+                                     comp=comp, trunc=trunc, thresh=True,
+                                     signed=signed, minmax=minmax)
+
         elif isofactor is not None:
             # Isovalue thresholding
-            cube_to_h5(path, delsrc=delsrc, comp=comp, trunc=trunc,
-                       thresh=True, signed=signed, isofactor=isofactor)
+            return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
+                                     comp=comp, trunc=trunc, thresh=True,
+                                     signed=signed, isofactor=isofactor)
+
         else:
             # No thresholding
-            cube_to_h5(path, thresh=False, delsrc=delsrc, comp=comp,
-                       trunc=trunc)
+            return _run_fxn_errcatch(cube_to_h5, cubepath=path, thresh=False,
+                                     delsrc=delsrc, comp=comp, trunc=trunc)
 
     else:
-        print("File extension not recognized. Exiting...")
-        sys.exit(EXIT.CMDLINE)
+        return (EXIT.CMDLINE, "Error: File extension not recognized.")
 
 
-if __name__ == '__main__':
-    main()
+def script_run():   # pragma: no cover
+    # Run program
+    out = main()
+
+    # If a message, print it
+    if out[1]:
+        print(out[1])
+
+    # Exit with whatever code
+    sys.exit(out[0])
+
+if __name__ == '__main__':   # pragma: no cover
+    script_run()
 

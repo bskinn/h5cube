@@ -24,6 +24,7 @@ class TestFunctionsMisc(ut.TestCase):
         cls.longMessage = True
 
     def test_FxnMisc_ExpFormat_Good(self):
+        """ Validate correct scientific notation formatting for decompression """
         from h5cube.h5cube import _exp_format as _ef
 
         with self.subTest(type='typical'):
@@ -36,6 +37,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertEqual(_ef(2.853 * 3.122e-123, 6), "  8.907066E-123")
 
     def test_FxnMisc_ExpFormat_Bad(self):
+        """ Confirm _exp_format breaks when bad arguments are passed """
         from h5cube.h5cube import _exp_format as _ef
 
         with self.subTest(type='string'):
@@ -45,6 +47,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertRaises(TypeError, _ef, ValueError(), 2)
 
     def test_FxnMisc_TryNext(self):
+        """ Confirm _trynext works as expected """
         from h5cube.h5cube import _trynext
 
         with self.subTest(type='not_exhausted'):
@@ -60,6 +63,7 @@ class TestFunctionsMisc(ut.TestCase):
             self.assertRaises(ValueError, _trynext, i, msg='Testing')
 
     def test_FxnMisc_TryNoNext(self):
+        """ Confirm _trynonext works as expected """
         from h5cube.h5cube import _trynonext
 
         with self.subTest(type='not_exhausted'):
@@ -135,6 +139,12 @@ class SuperFunctionsTest(object):
     # bytes filesize match window
     fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20
 
+    # Number of lines in the header of each file
+    hdr_lines = {'grid20': 22,
+                 'grid20ang': 22,
+                 'grid25mo': 14,
+                 'grid20mo6-8': 14}
+
     @staticmethod
     def shortsleep():
         from time import sleep
@@ -152,12 +162,14 @@ class SuperFunctionsTest(object):
         cls.clear_scratch()
 
     @classmethod
-    def copy_scratch(cls):
+    def copy_scratch(cls, ext, *, include=(), exclude=()):
         import os
         import shutil
 
         for fn in [fn for fn in os.listdir(cls.respath)
-                   if fn.endswith('.cube')]:
+                   if fn.endswith(ext)
+                   and (not include or os.path.splitext(fn)[0] in include)
+                   and not os.path.splitext(fn)[0] in exclude]:
             shutil.copy(os.path.join(cls.respath, fn),
                         os.path.join(cls.scrpath, fn))
 
@@ -201,6 +213,20 @@ class SuperFunctionsTest(object):
         import os
         return os.path.join(cls.scrpath, fn)
 
+    # Helper test method for things that could be ndarrays
+    @staticmethod
+    def robust_equal(v1, v2):
+        try:
+            # If it has a shape member, assume it's an ndarray
+            v1.shape + v2.shape
+        except AttributeError:
+            # Probably not ndarray, just compare values. Will blow up if
+            # one is ndarray and the other isn't
+            return v1 == v2
+        else:
+            # Probably is ndarray. Want same shape and identical values
+            return v1.shape == v2.shape and (v1 == v2).all()
+
 
 class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
 
@@ -210,7 +236,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
@@ -298,18 +324,22 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         fn = os.path.join(self.scrpath, "grid20.cube")
 
         # Extra confirmation that the file exists prior to processing
-        self.assertTrue(os.path.isfile(fn))
+        with self.subTest(type='exists_pre_exec'):
+            self.assertTrue(os.path.isfile(fn))
 
         # Just test the one grid20.cube for post-compress deletion
-        try:
-            cube_to_h5(fn, delsrc=True)
-        except Exception:
-            self.fail(msg="Conversion failed on '{0}'".format(fn))
+        with self.subTest(type='during_compression'):
+            try:
+                cube_to_h5(fn, delsrc=True)
+            except Exception:
+                self.fail(msg="Conversion failed on '{0}'".format(fn))
 
         # Confirm source file was deleted
-        self.assertFalse(os.path.isfile(fn))
+        with self.subTest(type='deleted_post_exec'):
+            self.assertFalse(os.path.isfile(fn))
 
     def test_FxnCubeToH5_MultiLineOrbsList(self):
+        """ Check that a multi-line orbital ID list compresses properly """
         import os
 
         # Filenames
@@ -353,7 +383,7 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         cls.ofpath = os.path.join(cls.scrpath, 'mod.cube')
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
@@ -397,6 +427,7 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
     def test_FxnCubeToH5_StubNumatomsOriginLine(self):
+        """ Ensure ValueError thrown if natoms/origin line is truncated """
         from h5cube import cube_to_h5
 
         # Stubify the numatoms line
@@ -542,6 +573,75 @@ class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
         self.assertRaises(ValueError, cube_to_h5, self.ofpath)
 
 
+class TestFunctionsH5ToCube_Good(SuperFunctionsTest, ut.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.longMessage = True
+        cls.ensure_scratch_dir()
+
+    def setUp(self):
+        self.copy_scratch('.h5cube')
+
+    def tearDown(self):
+        self.clear_scratch()
+
+    @staticmethod
+    def check_prec(fn, prec, lnum):
+        import re
+
+        p_prec = re.compile("-?\\d\.\\d{{{0}}}[ed]".format(prec), re.I)
+
+        with open(fn, 'r') as f:
+            lines = f.readlines()
+
+        return p_prec.search(lines[lnum]) is not None
+
+    def test_FxnH5ToCube_Prec(self):
+        from h5cube import h5_to_cube as htc
+        from h5cube import DEF
+        import os
+
+        prec_arg = [2, None]
+        prec_expect = [2, DEF.PREC]
+
+        for fn in os.listdir(self.scrpath):
+            for pa, pe in zip(prec_arg, prec_expect):
+                # Decompress
+                htc(self.scrfn(fn), prec=pa)
+
+                # Store the .cube filename
+                cube_fn = os.path.splitext(fn)[0] + '.cube'
+
+                # Store the line number to check
+                lnum = self.hdr_lines[os.path.splitext(fn)[0]]
+
+                with self.subTest(fn=fn, prec_arg=pa):
+                    self.assertTrue(self.check_prec(self.scrfn(cube_fn), pe, lnum),
+                                    msg="No value found with expected precision")
+
+    def test_FxnH5ToCube_Delete(self):
+        import os
+        from h5cube import h5_to_cube as htc
+
+        fn = self.scrfn("grid20.h5cube")
+
+        # Extra confirmation that the file exists prior to processing
+        with self.subTest(type='exists_pre_exec'):
+            self.assertTrue(os.path.isfile(fn))
+
+        # Just test the one grid20.cube for post-decompress deletion
+        with self.subTest(type='during_decompression'):
+            try:
+                htc(fn, delsrc=True)
+            except Exception:
+                self.fail(msg="Conversion failed on '{0}'".format(fn))
+
+        # Confirm source file was deleted
+        with self.subTest(type='deleted_post_exec'):
+            self.assertFalse(os.path.isfile(fn))
+
+
 class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
 
     @classmethod
@@ -550,12 +650,13 @@ class TestFunctionsCycled(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
     def setUp(self):
-        self.copy_scratch()
+        self.copy_scratch('.cube')
 
     def tearDown(self):
         self.clear_scratch()
 
     def test_FxnCycled_2xCycle(self):
+        """ Confirm no errors emerge on cycled compression/decompression """
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
         import os
@@ -609,7 +710,7 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
         cls.ensure_scratch_dir()
 
         # Copy the resource files only once, before all tests run
-        cls.copy_scratch()
+        cls.copy_scratch('.cube')
 
         # Copy the multi-MO CUBE to first temp name
         shutil.copy(cls.scrfn(basefn + '.cube'), cls.scrfn(cls.fn1 + '.cube'))
@@ -669,21 +770,18 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                                          hf2.get(key).value).all())
 
     def test_FxnDataCheck_H5_Unified_Check(self):
+        """ Confirm data consistency between a compressed and a re-compressed .h5cube """
         for key in [k for k in vars(self.H5)
                     if k == k.upper() and k == getattr(self.H5, k)]:
             with self.subTest(key=key):
                 self.do_h5py_test(key)
 
     def test_FxnDataCheck_Cube_Header_Check(self):
+        """ Confirm original and cycled .cubes have headers that parse to identical content """
         from h5cube import cube_to_h5 as cth
         from h5cube import h5_to_cube as htc
         from itertools import zip_longest as zipl
         import os
-
-        checklines = {'grid20.cube': 20,
-                      'grid20ang.cube': 20,
-                      'grid25mo.cube': 12,
-                      'grid20mo6-8.cube': 12}
 
         for fn in [f for f in os.listdir(self.respath) if f.endswith('.cube')]:
             # Compress, rename, decompress
@@ -702,7 +800,7 @@ class TestFunctionsDataCheck(SuperFunctionsTest, ut.TestCase):
                         self.assertEqual(next(newf), next(oldf))
 
                     # Data lines
-                    for i in range(checklines[fn]):
+                    for i in range(self.hdr_lines[os.path.splitext(fn)[0]] - 2):
                         for j, t in enumerate(zipl(next(oldf).split(),
                                                    next(newf).split())):
                             with self.subTest(fn=fn, line=i, element=j):
@@ -717,7 +815,7 @@ def suite_misc():
     return s
 
 
-def suite_goodh5():
+def suite_goodcth():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Good)])
@@ -725,10 +823,18 @@ def suite_goodh5():
     return s
 
 
-def suite_badh5():
+def suite_badcth():
     s = ut.TestSuite()
     tl = ut.TestLoader()
     s.addTests([tl.loadTestsFromTestCase(TestFunctionsCubeToH5_Bad)])
+
+    return s
+
+
+def suite_goodhtc():
+    s = ut.TestSuite()
+    tl = ut.TestLoader()
+    s.addTests([tl.loadTestsFromTestCase(TestFunctionsH5ToCube_Good)])
 
     return s
 

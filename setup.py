@@ -27,7 +27,7 @@ setup(
     zip_safe=bool(environ.get('TOX')),
     entry_points={
         'console_scripts': [
-            'h5cube = h5cube.h5cube:main'
+            'h5cube = h5cube.h5cube:script_run'
                            ]
                   }
 )

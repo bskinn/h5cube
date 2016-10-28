@@ -22,12 +22,16 @@ class AP(object):
 
     """
     ALL = 'all'
-    CMDLINE = 'cmdline'
-    FUNCTIONS = 'fxn'
+    CMDLINE = 'cl_all'
+    CMDLINE_GOOD = 'cl_good'
+    CMDLINE_BAD = 'cl_bad'
+    FUNCTIONS = 'fxn_all'
     FUNCTIONS_MISC = 'fxn_misc'
     FUNCTIONS_CGOOD = 'fxn_cgood'
     FUNCTIONS_CBAD = 'fxn_cbad'
     FUNCTIONS_CALL = 'fxn_call'
+    FUNCTIONS_DGOOD = 'fxn_dgood'
+    FUNCTIONS_DALL = 'fxn_dall'
     FUNCTIONS_DATA = 'fxn_data'
     FUNCTIONS_CYCLED = 'fxn_cycled'
 
@@ -50,15 +54,23 @@ def get_parser():
                      help="Show verbose output")
 
     # Groups without subgroups
-    gp_global.add_argument(AP.PFX.format(AP.ALL),
+    gp_global.add_argument(AP.PFX.format(AP.ALL), '-a',
                      action='store_true',
                      help="Run all tests (overrides any other selections)")
-    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE),
+
+    # Command line tests
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE), '-c',
                      action='store_true',
-                     help="Run tests of commandline interface")
+                     help="Run all tests of commandline interface")
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE_GOOD),
+                     action='store_true',
+                     help="Run 'no-error' commandline tests")
+    gp_cmdline.add_argument(AP.PFX.format(AP.CMDLINE_BAD),
+                     action='store_true',
+                     help="Run 'error-expected' commandline tests")
 
     # API function tests
-    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS),
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS), '-f',
                      action='store_true',
                      help="Run all API function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CALL),
@@ -71,6 +83,12 @@ def get_parser():
                          action='store_true',
                          help="Run 'error-expected' API compression "
                               "function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DALL),
+                         action='store_true',
+                         help="Run all API decompression function tests")
+    gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_DGOOD),
+                         action='store_true',
+                         help="Run 'no-error' API decompression function tests")
     gp_fxns.add_argument(AP.PFX.format(AP.FUNCTIONS_CYCLED),
                          action='store_true',
                          help="Run multi-cycled API function tests")
@@ -108,29 +126,39 @@ def main():
         if any(params[k] for k in flags):
             ts.addTest(suite)
 
-    # All commandline tests in one group for now
-    addsuiteif(h5cube.test.h5cube_cmdline.suite(), [AP.ALL, AP.CMDLINE])
+    # Commandline tests per-group
+    # 'Expect-good' group
+    addsuiteif(h5cube.test.h5cube_cmdline.suite_cmdline_good(),
+               [AP.ALL, AP.CMDLINE, AP.CMDLINE_GOOD])
+
+    # 'Expect-fail' group
+    addsuiteif(h5cube.test.h5cube_cmdline.suite_cmdline_bad(),
+               [AP.ALL, AP.CMDLINE, AP.CMDLINE_BAD])
 
     # API function tests split into groups
-    # Expected-good
-    addsuiteif(h5cube.test.h5cube_functions.suite_goodh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CGOOD])
+    # Expected-good compression
+    addsuiteif(h5cube.test.h5cube_functions.suite_goodcth(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CGOOD])
 
-    # Expected-bad
-    addsuiteif(h5cube.test.h5cube_functions.suite_badh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CBAD])
+    # Expected-bad compression
+    addsuiteif(h5cube.test.h5cube_functions.suite_badcth(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CALL, AP.FUNCTIONS_CBAD])
+
+    # Expected-good decompression
+    addsuiteif(h5cube.test.h5cube_functions.suite_goodhtc(),
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DALL, AP.FUNCTIONS_DGOOD])
 
     # Data validation tests
     addsuiteif(h5cube.test.h5cube_functions.suite_datacheckh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DATA])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_DATA])
 
     # Cycled execution tests
     addsuiteif(h5cube.test.h5cube_functions.suite_cycledh5(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLED])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_CYCLED])
 
     # Misc API tests
     addsuiteif(h5cube.test.h5cube_functions.suite_misc(),
-             [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_MISC])
+               [AP.ALL, AP.FUNCTIONS, AP.FUNCTIONS_MISC])
 
     # Create the test runner and execute
     ttr = ut.TextTestRunner(buffer=True,
@@ -143,3 +171,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
