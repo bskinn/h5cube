@@ -3,10 +3,10 @@ from os import environ
 
 setup(
     name='h5cube',
-    version='0.2.dev1',
+    version='0.2',
     provides=['h5cube'],
     requires=['h5py (>=2.4)', 'numpy (>=1.8)'],
-    packages=['h5cube', 'h5cube.test'],
+    packages=['h5cube'],
     url='https://www.github.com/bskinn/h5cube',
     license='MIT License',
     author='Brian Skinn',

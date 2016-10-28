@@ -1,5 +1,50 @@
 Changelog for h5cube
 
+v0.2 (27 Oct 2016)
+================================================================================
+
+Performance:
+
+* Re-implemented the data compression code such that all of the heavy
+  mathematical computation now occurs within numpy, instead of being handled
+  value-by-value in the Python interpreter. The speedup appears to be
+  approximately seven-fold, based on some cursory profiling.
+* Alongside the above, the numpy calculations were implemented using in-place
+  element-wise computations where practical, in order to minimize the RAM
+  footprint.
+
+Functionality:
+
+* Corrected some improper handling of orbital .cube files (flagged by a negative
+  number of atoms and the presence of one or more extra lines of orbital IDs).
+  Orbital CUBEs should now be handled properly on both compression
+  and decompression.
+* CUBEs with negative voxel dimensions should now be handled correctly. The
+  semantics of Bohrs vs Angstroms implied by these negative values are up to
+  the generating/parsing software to interpret, however.
+* When thresholding, zero field values are now coerced to the appropriate
+  threshold. Previously, the code did not detect zeros specially and the
+  calculation resulted in them staying as zero values in the final .h5cube.
+
+Implementation:
+
+* Handling and validation of command line input was refactored to be more
+  uniform and manageable, and much more amenable to future development if
+  required.
+* Validation of .cube files was made significantly more granular, such that
+  errors reported back to the user are much more targeted, and thus hopefully
+  much more useful.
+* Implemented a fix to cope with argparse's mis-detection of negative values in
+  scientific notation as multiple single-character arguments
+  (_tweak_neg_scinot)
+
+Infrastructure:
+
+* Test suite providing essentially complete code coverage is now in place
+  (test runner and test resources are not installed with the package, however)
+* The suite is set up to work with tox, for combinatorial testing of the various
+  claimed-compatible versions of Python, numpy and h5py
+
 v0.1.post2 (29 Aug 2016)
 ================================================================================
 
