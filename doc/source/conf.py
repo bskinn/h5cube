@@ -17,7 +17,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
+import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -346,6 +346,18 @@ texinfo_documents = [
 # texinfo_no_detailmenu = False
 
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'python': ('https://docs.python.org/3.5', None)}
-
+# Configuration for intersphinx. Heavily customized.
+isphx_local = os.environ.get('ISPHX_LOCAL')
+isphx_objpath = os.path.join('isphx','{0}')
+isphx_objstr = 'objects_{0}.inv'
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3.5',
+               isphx_objpath.format(isphx_objstr.format('python'))
+               if isphx_local else None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/',
+              isphx_objpath.format(isphx_objstr.format('numpy'))
+              if isphx_local else None),
+    'h5py': ('http://docs.h5py.org/en/latest/',
+             isphx_objpath.format(isphx_objstr.format('h5py'))
+             if isphx_local else None)
+    }
