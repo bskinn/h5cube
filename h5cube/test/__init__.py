@@ -1,11 +1,11 @@
 # ------------------------------------------------------------------------------
 # Name:        __init__
-# Purpose:     Package information for h5cube
+# Purpose:     Package submodule definition for the test suite
 #
 # Author:      Brian Skinn
 #                bskinn@alum.mit.edu
 #
-# Created:     22 Aug 2016
+# Created:     29 Aug 2016
 # Copyright:   (c) Brian Skinn 2016
 # License:     The MIT License; see "LICENSE.txt" for full license terms
 #                   and contributor agreement.
@@ -16,7 +16,7 @@
 
 from __future__ import absolute_import
 
-from .h5cube import cube_to_h5, h5_to_cube, H5, DEF, EXIT
+__all__ = ['h5cube_cmdline', 'h5cube_functions']
 
-__version__ = '0.2'
+from . import *
 
