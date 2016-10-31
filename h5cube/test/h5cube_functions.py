@@ -109,8 +109,8 @@ class SuperFunctionsTest(object):
                           'valtest': 0}}
     sizes_m1e_8m10 = {'nt': {'grid20': 23989,
                              'grid20ang': 23989,
-                             'grid25mo': 52313,
-                             'grid20mo6-8': 80454,
+                             'grid25mo': 51871,
+                             'grid20mo6-8': 79215,
                              'valtest': 17612},
                       'posix': {'grid20': 24041,
                                 'grid20ang': 24041,
@@ -119,8 +119,8 @@ class SuperFunctionsTest(object):
                                 'valtest': 0}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
                              'grid20ang': 17612,
-                             'grid25mo': 28880,
-                             'grid20mo6-8': 38011,
+                             'grid25mo': 25488,
+                             'grid20mo6-8': 34610,
                              'valtest': 17612},
                       'posix': {'grid20': 17664,
                                 'grid20ang': 17664,
@@ -129,8 +129,8 @@ class SuperFunctionsTest(object):
                                 'valtest': 0}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
                                  'grid20ang': 19660,
-                                 'grid25mo': 33164,
-                                 'grid20mo6-8': 48846,
+                                 'grid25mo': 30879,
+                                 'grid20mo6-8': 46085,
                                  'valtest': 17612},
                           'posix': {'grid20': 18038,
                                     'grid20ang': 18038,
@@ -139,8 +139,8 @@ class SuperFunctionsTest(object):
                                     'valtest': 0}}
     sizes_si0x002f5 = {'nt': {'grid20': 17612,
                               'grid20ang': 17612,
-                              'grid25mo': 25366,
-                              'grid20mo6-8': 31548,
+                              'grid25mo': 22138,
+                              'grid20mo6-8': 27689,
                               'valtest': 17612},
                        'posix': {'grid20': 17664,
                                  'grid20ang': 17664,
@@ -155,7 +155,8 @@ class SuperFunctionsTest(object):
     hdr_lines = {'grid20': 22,
                  'grid20ang': 22,
                  'grid25mo': 14,
-                 'grid20mo6-8': 14}
+                 'grid20mo6-8': 14,
+                 'valtest': 8}
 
     @staticmethod
     def shortsleep():
@@ -440,7 +441,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
                   'abs_val_nothresh': np.array([-100, -0.01, 0.001, 0.01, 100]),
                   'abs_val_hithresh': np.array([-50, -0.01, 0.001, 0.01, 50]),
                   'abs_val_lothresh': np.array([-100, -0.1, 0.1, 0.1, 100]),
-                  'abs_val_2xthresh': np.array([-50, -0.1, 0.1, 0.1, 30]),
+                  'abs_val_2xthresh': np.array([-30, -0.1, 0.1, 0.1, 30]),
                   'sgn_val_posthresh': np.array([1e-3, 1e-3, 1e-3, 0.01, 25]),
                   'sgn_val_negthresh': np.array([-50, -0.01, -1e-3,
                                                  -1e-3, -1e-3]),

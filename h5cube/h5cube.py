@@ -267,29 +267,56 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         except ValueError as e:
             raise ValueError('Error parsing volumetric data') from e
 
-        # Store the signs for output
-        signsarr = np.sign(workdataarr).astype(np.int8)
-
-        # Adjusted working log values; zeroes substituted with ones
-        np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
-
-        # Threshold. Spread out the np calls for easier reading, and calculate
-        # in-place for reduced RAM usage.
+        # Threshold. Where possible, spread out the np calls for easier
+        # reading and calculate in-place for reduced RAM usage.
         if thresh:
             if signed:
-                # Threshold, then absval
-                np.clip(workdataarr, *minmax, out=workdataarr)
-                np.abs(workdataarr, out=workdataarr)
+                # Trust error handling to catch if min > max...
+                if minmax[0] > 0:
+                    # Both min and max positive; must consider 'clipzero' for
+                    # minmax[0]; direct clip at minmax[1]
+                    workdataarr[workdataarr < minmax[0]] = (0 if clipzero else
+                                                            minmax[0])
+                    workdataarr[workdataarr > minmax[1]] = minmax[1]
+                elif minmax[1] < 0:
+                    # Both min and max negative; must consider 'clipzero' for
+                    # minmax[1]; direct clip at minmax[0]
+                    workdataarr[workdataarr > minmax[1]] = (0 if clipzero else
+                                                            minmax[1])
+                    workdataarr[workdataarr < minmax[0]] = minmax[0]
+                else:
+                    # min < 0 and max > 0; simple clip on both sides
+                    workdataarr.clip(*minmax, out=workdataarr)
             else:
-                # Absval, then threshold
-                np.abs(workdataarr, out=workdataarr)
-                np.clip(workdataarr, *minmax, out=workdataarr)
-        else:
-            # Just absval if no thresholding
-            np.abs(workdataarr, out=workdataarr)
+                # "Outer" clips are straightforward at +/- minmax[1]
+                workdataarr[workdataarr > minmax[1]] = minmax[1]
+                workdataarr[workdataarr < -minmax[1]] = -minmax[1]
 
-        # Finish with log base 10
-        np.log10(workdataarr, out=workdataarr)
+                # a/o Py3.5.1 and numpy 1.11.2, chained conditionals inside
+                #  indexing raise 'ambiguous comparison' ValueErrors, so
+                #  helper indexing arrays appear necessary
+                # Positive values (zeros are clipped to +minmax[0])
+                posmtx = (0 <= workdataarr) * (workdataarr < minmax[0])
+                workdataarr[posmtx] = (0 if clipzero else minmax[0])
+
+                # Negative values
+                negmtx = (0 > workdataarr) * (workdataarr > -minmax[0])
+                workdataarr[negmtx] = (0 if clipzero else -minmax[0])
+
+        # Store signs of the thresholded values
+        signsarr = np.sign(workdataarr).astype(np.int8)
+
+        # Take the absolute value of the array in prep for the upcoming log10
+        np.abs(workdataarr, out=workdataarr)
+
+        # Apply the log base 10, ignoring any math warnings
+        with np.warnings.catch_warnings(record=True):
+            np.log10(workdataarr, out=workdataarr)
+
+        # Replace any neginf with 0.0 (value is arbitrary, since the value
+        # recovered on decompression will be governed by the 0 value in
+        # signsarr)
+        workdataarr[np.isneginf(workdataarr)] = 0.0
 
         # Store the arrays, compressed (implicitly activates auto-sized
         #  chunking)
