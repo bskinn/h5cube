@@ -126,39 +126,48 @@ class TestCmdlineCompressGood(SuperCmdlineTest, ut.TestCase):
         # Return values
         kwdict = {'noargs': {'cubepath': scrfname,
                              'comp': None, 'trunc': None,
-                             'thresh': False, 'delsrc': False},
+                             'thresh': False, 'delsrc': False,
+                             'clipzero': False},
                   'nothresh': {'cubepath': scrfname,
-                             'comp': None, 'trunc': None,
-                             'thresh': False, 'delsrc': False},
+                               'comp': None, 'trunc': None,
+                               'thresh': False, 'delsrc': False,
+                               'clipzero': False},
                   'delsrc': {'cubepath': scrfname,
                              'comp': None, 'trunc': None,
-                             'thresh': False, 'delsrc': True},
+                             'thresh': False, 'delsrc': True,
+                             'clipzero': False},
                   'comp5': {'cubepath': scrfname,
                             'comp': 5, 'trunc': None,
-                            'thresh': False, 'delsrc': False},
+                            'thresh': False, 'delsrc': False,
+                            'clipzero': False},
                   'trunc3': {'cubepath': scrfname,
                              'comp': None, 'trunc': 3,
-                             'thresh': False, 'delsrc': False},
+                             'thresh': False, 'delsrc': False,
+                             'clipzero': False},
                   'minmax': {'cubepath': scrfname,
                              'comp': None, 'trunc': None,
                              'thresh': True, 'delsrc' : False,
                              'signed': False,
-                             'minmax': np.array([1e-5, 10])},
+                             'minmax': np.array([1e-5, 10]),
+                             'clipzero': False},
                   'ifac': {'cubepath': scrfname,
                            'comp': None, 'trunc': None,
                            'thresh': True, 'delsrc': False,
                            'signed': False,
-                           'isofactor': np.array([0.002, 5.0])},
+                           'isofactor': np.array([0.002, 5.0]),
+                           'clipzero': False},
                   'ifac_s': {'cubepath': scrfname,
                              'comp': None, 'trunc': None,
                              'thresh': True, 'delsrc': False,
                              'signed': True,
-                             'isofactor': np.array([-0.03, 10.0])},
+                             'isofactor': np.array([-0.03, 10.0]),
+                             'clipzero': False},
                   'mmax_s_nodec': {'cubepath': scrfname,
                                    'comp': None, 'trunc': None,
                                    'thresh': True, 'delsrc': False,
                                    'signed': True,
-                                   'minmax': np.array([-2e-2, 3e-1])}}
+                                   'minmax': np.array([-2e-2, 3e-1]),
+                                   'clipzero': False}}
 
         # Duplicate the mmax_s values to the other keys
         for k in [_ for _ in set(argsdict)
@@ -268,7 +277,8 @@ class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
                     'isofac_1val': [scrfname, '-i', '0.002'],
                     'prec_noval': [scrfname, '-p'],
                     'mmax_and_isoval': [scrfname, '-m', '1e-5', '10',
-                                        '-i', '0.002', '4']}
+                                        '-i', '0.002', '4'],
+                    'clip_value_and_zero': [scrfname, '-v', '-z']}
 
         # Run tests, expecting SystemExit
         for name in argsdict:
@@ -305,12 +315,15 @@ class TestCmdlineBad(SuperCmdlineTest, ut.TestCase):
                     'mmax_neg_min_in_abs': [scrcube, '-m', '-3', '5'],
                     'isof_zero_isovalue': [scrcube, '-i', '0.0', '5'],
                     'isof_fac_leq_one': [scrcube, '-i', '2e-3', '0.85'],
-                    'isof_neg_iso_abs_mode': [scrcube, '-a', '-i', '-1e-2', '10'],
+                    'isof_neg_iso_abs_mode': [scrcube, '-a', '-i',
+                                              '-1e-2', '10'],
                     'abs_mode_no_vals': [scrcube, '-a'],
                     'sign_mode_no_vals': [scrcube, '-s'],
                     'comp_opt_to_h5': [scrh5, '-t', '4'],
                     'decomp_opt_to_cube': [scrcube, '-p', '6'],
-                    'unk_file_ext': [scrtxt]}
+                    'unk_file_ext': [scrtxt],
+                    'val_no_thresh': [scrcube, '-v'],
+                    'zero_no_thresh': [scrcube, '-z']}
 
         # Run tests, expecting an EXIT.CMDLINE exit code
         self.run_nonparser_tests(baseargs, argsdict, EXIT.CMDLINE)

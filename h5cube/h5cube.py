@@ -29,6 +29,8 @@ class AP(object):
     NOTHRESH = 'nothresh'
     MINMAX = 'minmax'
     ISOFACTOR = 'isofactor'
+    VALUE = 'value'
+    ZERO = 'zero'
 
 # h5py constants
 class H5(object):
@@ -54,6 +56,7 @@ class DEF(object):
     COMP = 9
     DEL = False
     THRESH = False
+    CLIPZERO = False
 
 # Exit codes
 class EXIT(object):
@@ -104,7 +107,8 @@ def _trynonext(iterator, msg):
 
 
 def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
-               thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None):
+               thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None,
+               clipzero=DEF.CLIPZERO):
     """ [Docstring]
 
     """
@@ -470,6 +474,9 @@ def _get_parser():
 
     import argparse as ap
 
+    argshort = '-{0}'
+    arglong = '--{0}'
+
     # Core parser
     prs = ap.ArgumentParser(description="Gaussian CUBE (de)compression "
                                         "via h5py",
@@ -486,6 +493,9 @@ def _get_parser():
                                                  "mode (mutually exclusive)")
     gp_threshvals = prs.add_argument_group(title="compression thresholding "
                                                  "values (mutually exclusive)")
+    gp_threshclip = prs.add_argument_group(title="compression thresholding "
+                                                 "clipping mode (mutually "
+                                                 "exclusive)")
 
     # Decompression group
     gp_decomp = prs.add_argument_group(title="decompression options")
@@ -495,6 +505,7 @@ def _get_parser():
     # Mutually exclusive subgroups for the compression operation
     meg_threshmode = gp_threshmode.add_mutually_exclusive_group()
     meg_threshvals = gp_threshvals.add_mutually_exclusive_group()
+    meg_threshclip = gp_threshclip.add_mutually_exclusive_group()
 
     # Argument for the filename (core parser)
     prs.add_argument(AP.PATH, action='store',
@@ -507,13 +518,13 @@ def _get_parser():
                           "on any other extension")
 
     # Argument to delete the source file; default is to keep (core)
-    prs.add_argument('-{0}'.format(AP.DELETE[0]), '--{0}'.format(AP.DELETE),
+    prs.add_argument(argshort.format(AP.DELETE[0]), arglong.format(AP.DELETE),
                      action='store_true',
                      help="delete the source file after (de)compression")
 
     # gzip compression level (compress)
-    gp_comp.add_argument('-{0}'.format(AP.COMPRESS[0]),
-                         '--{0}'.format(AP.COMPRESS),
+    gp_comp.add_argument(argshort.format(AP.COMPRESS[0]),
+                         arglong.format(AP.COMPRESS),
                          action='store', default=None, type=int,
                          choices=list(range(10)),
                          metavar='#',
@@ -521,8 +532,8 @@ def _get_parser():
                               "data (0-9, default {0})".format(DEF.COMP))
 
     # gzip truncation level (compress)
-    gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
-                         '--{0}'.format(AP.TRUNC),
+    gp_comp.add_argument(argshort.format(AP.TRUNC[0]),
+                         arglong.format(AP.TRUNC),
                          action='store', default=None, type=int,
                          choices=list(range(16)),
                          metavar='#',
@@ -532,31 +543,31 @@ def _get_parser():
                               "0-15, default {0})".format(DEF.TRUNC))
 
     # Absolute thresholding mode (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.ABSMODE[0]),
-                                '--{0}'.format(AP.ABSMODE),
+    meg_threshmode.add_argument(argshort.format(AP.ABSMODE[0]),
+                                arglong.format(AP.ABSMODE),
                                 action='store_true',
                                 help="absolute-value thresholding "
                                      "mode (default if -{0} or -{1} "
-                                     "specified".format(AP.MINMAX[0],
+                                     "specified)".format(AP.MINMAX[0],
                                      AP.ISOFACTOR[0]))
 
     # Signed thresholding mode (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.SIGNMODE[0]),
-                                '--{0}'.format(AP.SIGNMODE),
+    meg_threshmode.add_argument(argshort.format(AP.SIGNMODE[0]),
+                                arglong.format(AP.SIGNMODE),
                                 action='store_true',
                                 help="signed-value thresholding "
                                      "mode")
 
     # Thresholding mode disabled (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.NOTHRESH[0]),
-                                '--{0}'.format(AP.NOTHRESH),
+    meg_threshmode.add_argument(argshort.format(AP.NOTHRESH[0]),
+                                arglong.format(AP.NOTHRESH),
                                 action='store_true',
                                 help="thresholding disabled (default)")
 
 
     # Min/max threshold specification (compress -- threshold values)
-    meg_threshvals.add_argument('-{0}'.format(AP.MINMAX[0]),
-                                '--{0}'.format(AP.MINMAX),
+    meg_threshvals.add_argument(argshort.format(AP.MINMAX[0]),
+                                arglong.format(AP.MINMAX),
                                 action='store',
                                 default=None,
                                 nargs=2,
@@ -566,21 +577,34 @@ def _get_parser():
                                      "-m [min] [max])")
 
     # Isovalue/factor threshold specification (compress -- threshold values)
-    meg_threshvals.add_argument('-{0}'.format(AP.ISOFACTOR[0]),
-                                '--{0}'.format(AP.ISOFACTOR),
+    meg_threshvals.add_argument(argshort.format(AP.ISOFACTOR[0]),
+                                arglong.format(AP.ISOFACTOR),
                                 action='store',
                                 default=None,
                                 nargs=2,
                                 metavar='#',
-                                help="Isovalue and multiplicative "
+                                help="isovalue and multiplicative "
                                      "factor values for "
                                      "threshold specification (e.g., "
                                      "'-i 0.002 4' corresponds to "
                                      "'-m 0.0005 0.008')")
 
+    # Thresholding clip modes (compress -- threshold clip-to-value mode)
+    meg_threshclip.add_argument(argshort.format(AP.VALUE[0]),
+                                arglong.format(AP.VALUE),
+                                action='store_true',
+                                help="clip small values to nearest threshold "
+                                     "value (default if -m or -i specified)")
+
+    # Thresholding clip modes (compress -- threshold clip-to-zero mode)
+    meg_threshclip.add_argument(argshort.format(AP.ZERO[0]),
+                                arglong.format(AP.ZERO),
+                                action='store_true',
+                                help="clip small values to zero")
+
     # Data block output precision (decompress)
-    gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
-                           '--{0}'.format(AP.PREC),
+    gp_decomp.add_argument(argshort.format(AP.PREC[0]),
+                           arglong.format(AP.PREC),
                            action='store', default=None, type=int,
                            choices=list(range(16)),
                            metavar='#',
@@ -635,6 +659,8 @@ def main():
     nothresh = params[AP.NOTHRESH]
     minmax = params[AP.MINMAX]
     isofactor = params[AP.ISOFACTOR]
+    value = params[AP.VALUE]
+    zero = params[AP.ZERO]
 
     # Composite indicators for which types of arguments passed
     def not_none_or_false(x):
@@ -645,7 +671,8 @@ def main():
 
     compargs = any(map(not_none_or_false, [comp, trunc, absolute,
                                            signed, nothresh,
-                                           minmax, isofactor]))
+                                           minmax, isofactor,
+                                           value, zero]))
 
     decompargs = any(map(not_none_or_false, [prec]))
 
@@ -678,6 +705,12 @@ def main():
         return (EXIT.CMDLINE, "Error: Thresholding mode specified but"
                               "no values provided")
 
+    # Complain if a thresholding clip mode is indicated but no threshold
+    # values are provided
+    if (value or zero) and (minmax is None and isofactor is None):
+        return (EXIT.CMDLINE, "Error: Thresholding clip mode specified "
+                              "but no values provided")
+
     # Check file extension as indication of execution mode
     if ext.lower() == '.h5cube':
         # Decompression mode
@@ -698,18 +731,21 @@ def main():
             # Min/max thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
                                      comp=comp, trunc=trunc, thresh=True,
-                                     signed=signed, minmax=minmax)
+                                     signed=signed, minmax=minmax,
+                                     clipzero=zero)
 
         elif isofactor is not None:
             # Isovalue thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
                                      comp=comp, trunc=trunc, thresh=True,
-                                     signed=signed, isofactor=isofactor)
+                                     signed=signed, isofactor=isofactor,
+                                     clipzero=zero)
 
         else:
             # No thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, thresh=False,
-                                     delsrc=delsrc, comp=comp, trunc=trunc)
+                                     delsrc=delsrc, comp=comp, trunc=trunc,
+                                     clipzero=False)
 
     else:
         return (EXIT.CMDLINE, "Error: File extension not recognized.")
