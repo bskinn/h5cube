@@ -7,7 +7,7 @@ def readme():
 
 setup(
     name='h5cube',
-    version='0.2',
+    version='0.3',
     provides=['h5cube'],
     requires=['h5py (>=2.4)', 'numpy (>=1.8)'],
     packages=['h5cube'],
@@ -35,4 +35,4 @@ setup(
             'h5cube = h5cube.h5cube:script_run'
                            ]
                   }
-)
+    )

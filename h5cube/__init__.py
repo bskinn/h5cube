@@ -18,5 +18,5 @@ from __future__ import absolute_import
 
 from .h5cube import cube_to_h5, h5_to_cube, H5, DEF, EXIT
 
-__version__ = '0.2'
+__version__ = '0.3'
 
