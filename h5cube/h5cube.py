@@ -29,6 +29,8 @@ class AP(object):
     NOTHRESH = 'nothresh'
     MINMAX = 'minmax'
     ISOFACTOR = 'isofactor'
+    VALUE = 'value'
+    ZERO = 'zero'
 
 # h5py constants
 class H5(object):
@@ -54,6 +56,7 @@ class DEF(object):
     COMP = 9
     DEL = False
     THRESH = False
+    CLIPZERO = False
 
 # Exit codes
 class EXIT(object):
@@ -104,7 +107,8 @@ def _trynonext(iterator, msg):
 
 
 def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
-               thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None):
+               thresh=DEF.THRESH, signed=None, minmax=None, isofactor=None,
+               clipzero=DEF.CLIPZERO):
     """ [Docstring]
 
     """
@@ -263,29 +267,56 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         except ValueError as e:
             raise ValueError('Error parsing volumetric data') from e
 
-        # Store the signs for output
-        signsarr = np.sign(workdataarr).astype(np.int8)
-
-        # Adjusted working log values; zeroes substituted with ones
-        np.add(workdataarr, 1.0 - np.abs(signsarr), out=workdataarr)
-
-        # Threshold. Spread out the np calls for easier reading, and calculate
-        # in-place for reduced RAM usage.
+        # Threshold. Where possible, spread out the np calls for easier
+        # reading and calculate in-place for reduced RAM usage.
         if thresh:
             if signed:
-                # Threshold, then absval
-                np.clip(workdataarr, *minmax, out=workdataarr)
-                np.abs(workdataarr, out=workdataarr)
+                # Trust error handling to catch if min > max...
+                if minmax[0] > 0:
+                    # Both min and max positive; must consider 'clipzero' for
+                    # minmax[0]; direct clip at minmax[1]
+                    workdataarr[workdataarr < minmax[0]] = (0 if clipzero else
+                                                            minmax[0])
+                    workdataarr[workdataarr > minmax[1]] = minmax[1]
+                elif minmax[1] < 0:
+                    # Both min and max negative; must consider 'clipzero' for
+                    # minmax[1]; direct clip at minmax[0]
+                    workdataarr[workdataarr > minmax[1]] = (0 if clipzero else
+                                                            minmax[1])
+                    workdataarr[workdataarr < minmax[0]] = minmax[0]
+                else:
+                    # min < 0 and max > 0; simple clip on both sides
+                    workdataarr.clip(*minmax, out=workdataarr)
             else:
-                # Absval, then threshold
-                np.abs(workdataarr, out=workdataarr)
-                np.clip(workdataarr, *minmax, out=workdataarr)
-        else:
-            # Just absval if no thresholding
-            np.abs(workdataarr, out=workdataarr)
+                # "Outer" clips are straightforward at +/- minmax[1]
+                workdataarr[workdataarr > minmax[1]] = minmax[1]
+                workdataarr[workdataarr < -minmax[1]] = -minmax[1]
 
-        # Finish with log base 10
-        np.log10(workdataarr, out=workdataarr)
+                # a/o Py3.5.1 and numpy 1.11.2, chained conditionals inside
+                #  indexing raise 'ambiguous comparison' ValueErrors, so
+                #  helper indexing arrays appear necessary
+                # Positive values (zeros are clipped to +minmax[0])
+                posmtx = (0 <= workdataarr) * (workdataarr < minmax[0])
+                workdataarr[posmtx] = (0 if clipzero else minmax[0])
+
+                # Negative values
+                negmtx = (0 > workdataarr) * (workdataarr > -minmax[0])
+                workdataarr[negmtx] = (0 if clipzero else -minmax[0])
+
+        # Store signs of the thresholded values
+        signsarr = np.sign(workdataarr).astype(np.int8)
+
+        # Take the absolute value of the array in prep for the upcoming log10
+        np.abs(workdataarr, out=workdataarr)
+
+        # Apply the log base 10, ignoring any math warnings
+        with np.warnings.catch_warnings(record=True):
+            np.log10(workdataarr, out=workdataarr)
+
+        # Replace any neginf with 0.0 (value is arbitrary, since the value
+        # recovered on decompression will be governed by the 0 value in
+        # signsarr)
+        workdataarr[np.isneginf(workdataarr)] = 0.0
 
         # Store the arrays, compressed (implicitly activates auto-sized
         #  chunking)
@@ -470,6 +501,9 @@ def _get_parser():
 
     import argparse as ap
 
+    argshort = '-{0}'
+    arglong = '--{0}'
+
     # Core parser
     prs = ap.ArgumentParser(description="Gaussian CUBE (de)compression "
                                         "via h5py",
@@ -486,6 +520,9 @@ def _get_parser():
                                                  "mode (mutually exclusive)")
     gp_threshvals = prs.add_argument_group(title="compression thresholding "
                                                  "values (mutually exclusive)")
+    gp_threshclip = prs.add_argument_group(title="compression thresholding "
+                                                 "clipping mode (mutually "
+                                                 "exclusive)")
 
     # Decompression group
     gp_decomp = prs.add_argument_group(title="decompression options")
@@ -495,6 +532,7 @@ def _get_parser():
     # Mutually exclusive subgroups for the compression operation
     meg_threshmode = gp_threshmode.add_mutually_exclusive_group()
     meg_threshvals = gp_threshvals.add_mutually_exclusive_group()
+    meg_threshclip = gp_threshclip.add_mutually_exclusive_group()
 
     # Argument for the filename (core parser)
     prs.add_argument(AP.PATH, action='store',
@@ -507,13 +545,13 @@ def _get_parser():
                           "on any other extension")
 
     # Argument to delete the source file; default is to keep (core)
-    prs.add_argument('-{0}'.format(AP.DELETE[0]), '--{0}'.format(AP.DELETE),
+    prs.add_argument(argshort.format(AP.DELETE[0]), arglong.format(AP.DELETE),
                      action='store_true',
                      help="delete the source file after (de)compression")
 
     # gzip compression level (compress)
-    gp_comp.add_argument('-{0}'.format(AP.COMPRESS[0]),
-                         '--{0}'.format(AP.COMPRESS),
+    gp_comp.add_argument(argshort.format(AP.COMPRESS[0]),
+                         arglong.format(AP.COMPRESS),
                          action='store', default=None, type=int,
                          choices=list(range(10)),
                          metavar='#',
@@ -521,8 +559,8 @@ def _get_parser():
                               "data (0-9, default {0})".format(DEF.COMP))
 
     # gzip truncation level (compress)
-    gp_comp.add_argument('-{0}'.format(AP.TRUNC[0]),
-                         '--{0}'.format(AP.TRUNC),
+    gp_comp.add_argument(argshort.format(AP.TRUNC[0]),
+                         arglong.format(AP.TRUNC),
                          action='store', default=None, type=int,
                          choices=list(range(16)),
                          metavar='#',
@@ -532,31 +570,31 @@ def _get_parser():
                               "0-15, default {0})".format(DEF.TRUNC))
 
     # Absolute thresholding mode (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.ABSMODE[0]),
-                                '--{0}'.format(AP.ABSMODE),
+    meg_threshmode.add_argument(argshort.format(AP.ABSMODE[0]),
+                                arglong.format(AP.ABSMODE),
                                 action='store_true',
                                 help="absolute-value thresholding "
                                      "mode (default if -{0} or -{1} "
-                                     "specified".format(AP.MINMAX[0],
+                                     "specified)".format(AP.MINMAX[0],
                                      AP.ISOFACTOR[0]))
 
     # Signed thresholding mode (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.SIGNMODE[0]),
-                                '--{0}'.format(AP.SIGNMODE),
+    meg_threshmode.add_argument(argshort.format(AP.SIGNMODE[0]),
+                                arglong.format(AP.SIGNMODE),
                                 action='store_true',
                                 help="signed-value thresholding "
                                      "mode")
 
     # Thresholding mode disabled (compress -- threshold mode)
-    meg_threshmode.add_argument('-{0}'.format(AP.NOTHRESH[0]),
-                                '--{0}'.format(AP.NOTHRESH),
+    meg_threshmode.add_argument(argshort.format(AP.NOTHRESH[0]),
+                                arglong.format(AP.NOTHRESH),
                                 action='store_true',
                                 help="thresholding disabled (default)")
 
 
     # Min/max threshold specification (compress -- threshold values)
-    meg_threshvals.add_argument('-{0}'.format(AP.MINMAX[0]),
-                                '--{0}'.format(AP.MINMAX),
+    meg_threshvals.add_argument(argshort.format(AP.MINMAX[0]),
+                                arglong.format(AP.MINMAX),
                                 action='store',
                                 default=None,
                                 nargs=2,
@@ -566,21 +604,34 @@ def _get_parser():
                                      "-m [min] [max])")
 
     # Isovalue/factor threshold specification (compress -- threshold values)
-    meg_threshvals.add_argument('-{0}'.format(AP.ISOFACTOR[0]),
-                                '--{0}'.format(AP.ISOFACTOR),
+    meg_threshvals.add_argument(argshort.format(AP.ISOFACTOR[0]),
+                                arglong.format(AP.ISOFACTOR),
                                 action='store',
                                 default=None,
                                 nargs=2,
                                 metavar='#',
-                                help="Isovalue and multiplicative "
+                                help="isovalue and multiplicative "
                                      "factor values for "
                                      "threshold specification (e.g., "
                                      "'-i 0.002 4' corresponds to "
                                      "'-m 0.0005 0.008')")
 
+    # Thresholding clip modes (compress -- threshold clip-to-value mode)
+    meg_threshclip.add_argument(argshort.format(AP.VALUE[0]),
+                                arglong.format(AP.VALUE),
+                                action='store_true',
+                                help="clip small values to nearest threshold "
+                                     "value (default if -m or -i specified)")
+
+    # Thresholding clip modes (compress -- threshold clip-to-zero mode)
+    meg_threshclip.add_argument(argshort.format(AP.ZERO[0]),
+                                arglong.format(AP.ZERO),
+                                action='store_true',
+                                help="clip small values to zero")
+
     # Data block output precision (decompress)
-    gp_decomp.add_argument('-{0}'.format(AP.PREC[0]),
-                           '--{0}'.format(AP.PREC),
+    gp_decomp.add_argument(argshort.format(AP.PREC[0]),
+                           arglong.format(AP.PREC),
                            action='store', default=None, type=int,
                            choices=list(range(16)),
                            metavar='#',
@@ -635,6 +686,8 @@ def main():
     nothresh = params[AP.NOTHRESH]
     minmax = params[AP.MINMAX]
     isofactor = params[AP.ISOFACTOR]
+    value = params[AP.VALUE]
+    zero = params[AP.ZERO]
 
     # Composite indicators for which types of arguments passed
     def not_none_or_false(x):
@@ -645,7 +698,8 @@ def main():
 
     compargs = any(map(not_none_or_false, [comp, trunc, absolute,
                                            signed, nothresh,
-                                           minmax, isofactor]))
+                                           minmax, isofactor,
+                                           value, zero]))
 
     decompargs = any(map(not_none_or_false, [prec]))
 
@@ -678,6 +732,12 @@ def main():
         return (EXIT.CMDLINE, "Error: Thresholding mode specified but"
                               "no values provided")
 
+    # Complain if a thresholding clip mode is indicated but no threshold
+    # values are provided
+    if (value or zero) and (minmax is None and isofactor is None):
+        return (EXIT.CMDLINE, "Error: Thresholding clip mode specified "
+                              "but no values provided")
+
     # Check file extension as indication of execution mode
     if ext.lower() == '.h5cube':
         # Decompression mode
@@ -698,18 +758,21 @@ def main():
             # Min/max thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
                                      comp=comp, trunc=trunc, thresh=True,
-                                     signed=signed, minmax=minmax)
+                                     signed=signed, minmax=minmax,
+                                     clipzero=zero)
 
         elif isofactor is not None:
             # Isovalue thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, delsrc=delsrc,
                                      comp=comp, trunc=trunc, thresh=True,
-                                     signed=signed, isofactor=isofactor)
+                                     signed=signed, isofactor=isofactor,
+                                     clipzero=zero)
 
         else:
             # No thresholding
             return _run_fxn_errcatch(cube_to_h5, cubepath=path, thresh=False,
-                                     delsrc=delsrc, comp=comp, trunc=trunc)
+                                     delsrc=delsrc, comp=comp, trunc=trunc,
+                                     clipzero=False)
 
     else:
         return (EXIT.CMDLINE, "Error: File extension not recognized.")

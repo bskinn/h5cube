@@ -1,5 +1,26 @@
 Changelog for h5cube
 
+v0.3 (31 Oct 2016)
+================================================================================
+
+Bugfix:
+
+* Thresholding behavior was badly erroneous, sufficient to warrant immediate
+  repair.  Negative or zero field values would be thresholded unpredictably,
+  especially in 'signed' thresholding mode.
+
+Infrastructure:
+
+* A new test method 'test_FxnCubeToH5_Thresholding' in the TestCase
+  'TestFunctionsCubeToH5_Good' should(?) provide reasonable assurance of
+  the intended thresholding behavior.
+
+Functionality:
+
+* Proper fixing of the above thresholding misbehavior opened a natural
+  opportunity to implement the 'clip to zero' thresholding option of GitHub
+  Issue #21 (https://github.com/bskinn/h5cube/issues/21).
+
 v0.2 (27 Oct 2016)
 ================================================================================
 

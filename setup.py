@@ -1,9 +1,13 @@
 from setuptools import setup
 from os import environ
 
+def readme():
+    with open('README.rst') as f:
+        return f.read()
+
 setup(
     name='h5cube',
-    version='0.2',
+    version='0.3',
     provides=['h5cube'],
     requires=['h5py (>=2.4)', 'numpy (>=1.8)'],
     packages=['h5cube'],
@@ -12,6 +16,7 @@ setup(
     author='Brian Skinn',
     author_email='bskinn@alum.mit.edu',
     description='Gaussian CUBE File Compression Utility',
+    long_description=readme(),
     classifiers=['License :: OSI Approved :: MIT License',
                  'Natural Language :: English',
                  'Environment :: Console',
@@ -30,4 +35,4 @@ setup(
             'h5cube = h5cube.h5cube:script_run'
                            ]
                   }
-)
+    )

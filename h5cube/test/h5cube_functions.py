@@ -90,51 +90,63 @@ class SuperFunctionsTest(object):
     sizes_noargs = {'nt': {'grid20': 38876,
                            'grid20ang': 38876,
                            'grid25mo': 60151,
-                           'grid20mo6-8': 89504},
+                           'grid20mo6-8': 89504,
+                           'valtest': 17612},
                     'posix': {'grid20': 38928,
                               'grid20ang': 38928,
                               'grid25mo': 60098,
-                              'grid20mo6-8': 89196}}
+                              'grid20mo6-8': 89196,
+                              'valtest': 17664}}
     sizes_t2 = {'nt': {'grid20': 28876,
                        'grid20ang': 28876,
                        'grid25mo': 40530,
-                       'grid20mo6-8': 55860},
+                       'grid20mo6-8': 55860,
+                       'valtest': 17612},
                 'posix': {'grid20': 28584,
                           'grid20ang': 28584,
                           'grid25mo': 40582,
-                          'grid20mo6-8': 55552}}
+                          'grid20mo6-8': 55552,
+                          'valtest': 17664}}
     sizes_m1e_8m10 = {'nt': {'grid20': 23989,
                              'grid20ang': 23989,
-                             'grid25mo': 52313,
-                             'grid20mo6-8': 80454},
+                             'grid25mo': 51871,
+                             'grid20mo6-8': 79215,
+                             'valtest': 17612},
                       'posix': {'grid20': 24041,
                                 'grid20ang': 24041,
-                                'grid25mo': 52428,
-                                'grid20mo6-8': 80254}}
+                                'grid25mo': 51659,
+                                'grid20mo6-8': 79154,
+                                'valtest': 17664}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
                              'grid20ang': 17612,
-                             'grid25mo': 28880,
-                             'grid20mo6-8': 38011},
+                             'grid25mo': 25488,
+                             'grid20mo6-8': 34610,
+                             'valtest': 17612},
                       'posix': {'grid20': 17664,
                                 'grid20ang': 17664,
-                                'grid25mo': 28529,
-                                'grid20mo6-8': 37836}}
+                                'grid25mo': 25307,
+                                'grid20mo6-8': 34440,
+                                'valtest': 17664}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
                                  'grid20ang': 19660,
-                                 'grid25mo': 33164,
-                                 'grid20mo6-8': 48846},
+                                 'grid25mo': 30879,
+                                 'grid20mo6-8': 46085,
+                                 'valtest': 17612},
                           'posix': {'grid20': 18038,
                                     'grid20ang': 18038,
-                                    'grid25mo': 32919,
-                                    'grid20mo6-8': 48774}}
+                                    'grid25mo': 30667,
+                                    'grid20mo6-8': 45982,
+                                    'valtest': 17664}}
     sizes_si0x002f5 = {'nt': {'grid20': 17612,
                               'grid20ang': 17612,
-                              'grid25mo': 25366,
-                              'grid20mo6-8': 31548},
+                              'grid25mo': 22138,
+                              'grid20mo6-8': 27689,
+                              'valtest': 17612},
                        'posix': {'grid20': 17664,
                                  'grid20ang': 17664,
-                                 'grid25mo': 25359,
-                                 'grid20mo6-8': 31426}}
+                                 'grid25mo': 21929,
+                                 'grid20mo6-8': 27516,
+                                 'valtest': 17664}}
 
     # bytes filesize match window
     fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20
@@ -143,7 +155,8 @@ class SuperFunctionsTest(object):
     hdr_lines = {'grid20': 22,
                  'grid20ang': 22,
                  'grid25mo': 14,
-                 'grid20mo6-8': 14}
+                 'grid20mo6-8': 14,
+                 'valtest': 8}
 
     @staticmethod
     def shortsleep():
@@ -321,7 +334,7 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
         import os
         from h5cube import cube_to_h5
 
-        fn = os.path.join(self.scrpath, "grid20.cube")
+        fn = self.scrfn("grid20.cube")
 
         # Extra confirmation that the file exists prior to processing
         with self.subTest(type='exists_pre_exec'):
@@ -367,6 +380,100 @@ class TestFunctionsCubeToH5_Good(SuperFunctionsTest, ut.TestCase):
 
         # Try to process the output file (should be only the one left)
         self.basetest_FxnCubeToH5(sizes=self.sizes_noargs[os.name])
+
+    def test_FxnCubeToH5_Thresholding(self):
+        from h5cube import cube_to_h5 as cth
+        from h5cube import H5
+        import numpy as np
+        import h5py as h5
+
+        # Filename to work with; specially constructed cube for value testing
+        cubefn = self.scrfn('valtest.cube')
+        h5fn = self.scrfn('valtest.h5cube')
+
+        # Dict of the extra args to pass
+        argsdict={'nothresh': {},
+                  'abs_val_nothresh': {'minmax': [1e-3, 1000],
+                                     'thresh': True, 'signed': False,
+                                     'clipzero': False},
+                  'abs_val_hithresh': {'minmax': [1e-3, 50],
+                                     'thresh': True, 'signed': False,
+                                     'clipzero': False},
+                  'abs_val_lothresh': {'minmax': [1e-1, 1000],
+                                     'thresh': True, 'signed': False,
+                                     'clipzero': False},
+                  'abs_val_2xthresh': {'minmax': [1e-1, 30],
+                                     'thresh': True, 'signed': False,
+                                     'clipzero': False},
+                  'sgn_val_posthresh': {'minmax': [1e-3, 25],
+                                     'thresh': True, 'signed': True,
+                                     'clipzero': False},
+                  'sgn_val_negthresh': {'minmax': [-50, -1e-3],
+                                        'thresh': True, 'signed': True,
+                                        'clipzero': False},
+                  'sgn_val_posneg': {'minmax': [-60, 40],
+                                     'thresh': True, 'signed': True,
+                                     'clipzero': False},
+                  'abs_zero_nothresh': {'minmax': [1e-3, 1000],
+                                        'thresh': True, 'signed': False,
+                                        'clipzero': True},
+                  'abs_zero_hithresh': {'minmax': [1e-3, 65],
+                                        'thresh': True, 'signed': False,
+                                        'clipzero': True},
+                  'abs_zero_lothresh': {'minmax': [2e-1, 500],
+                                        'thresh': True, 'signed': False,
+                                        'clipzero': True},
+                  'abs_zero_2xthresh': {'minmax': [2.5e-1, 74],
+                                        'thresh': True, 'signed': False,
+                                        'clipzero': True},
+                  'sgn_zero_posthresh': {'minmax': [1.3e-3, 57],
+                                         'thresh': True, 'signed': True,
+                                         'clipzero': True},
+                  'sgn_zero_negthresh': {'minmax': [-62, -4.8e-2],
+                                         'thresh': True, 'signed': True,
+                                         'clipzero': True},
+                  'sgn_zero_posneg': {'minmax': [-32, 1.385e-4],
+                                      'thresh': True, 'signed': True,
+                                      'clipzero': True}}
+
+        # Dict of the expected values in the compressed cube
+        valsdict={'nothresh': np.array([-100, -0.01, 0, 0.01, 100]),
+                  'abs_val_nothresh': np.array([-100, -0.01, 0.001, 0.01, 100]),
+                  'abs_val_hithresh': np.array([-50, -0.01, 0.001, 0.01, 50]),
+                  'abs_val_lothresh': np.array([-100, -0.1, 0.1, 0.1, 100]),
+                  'abs_val_2xthresh': np.array([-30, -0.1, 0.1, 0.1, 30]),
+                  'sgn_val_posthresh': np.array([1e-3, 1e-3, 1e-3, 0.01, 25]),
+                  'sgn_val_negthresh': np.array([-50, -0.01, -1e-3,
+                                                 -1e-3, -1e-3]),
+                  'sgn_val_posneg': np.array([-60, -0.01, 0, 0.01, 40]),
+                  'abs_zero_nothresh': np.array([-100, -0.01, 0, 0.01, 100]),
+                  'abs_zero_hithresh': np.array([-65, -0.01, 0, 0.01, 65]),
+                  'abs_zero_lothresh': np.array([-100, 0, 0, 0, 100]),
+                  'abs_zero_2xthresh': np.array([-74, 0, 0, 0, 74]),
+                  'sgn_zero_posthresh': np.array([0, 0, 0, 0.01, 57]),
+                  'sgn_zero_negthresh': np.array([-62, 0, 0, 0, 0]),
+                  'sgn_zero_posneg': np.array([-32, -0.01, 0,
+                                               1.385e-4, 1.385e-4])}
+
+        for name in argsdict:
+            # Compress the test file with each set of indicated args
+            cth(cubefn, **argsdict[name])
+
+            # Open the h5cube and retrieve the values
+            with h5.File(h5fn) as hf:
+                vals = np.multiply(hf[H5.SIGNS],
+                                   np.power(10, hf[H5.LOGDATA])).squeeze()
+
+            # Check that the returned values match the expected ones
+            with self.subTest(name=name):
+                eqs = np.isclose(vals, valsdict[name], rtol=1e-4)
+                eqmiss = np.nonzero(eqs == False)[0]
+                valmiss = valsdict[name][eqmiss]
+                retmiss = vals[eqmiss]
+                self.assertTrue(np.all(eqs),
+                                msg="(index, expected, actual) {0}"
+                                    .format(list(zip(eqmiss,
+                                                     valmiss, retmiss))))
 
 
 class TestFunctionsCubeToH5_Bad(SuperFunctionsTest, ut.TestCase):
