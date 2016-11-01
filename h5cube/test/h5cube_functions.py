@@ -96,7 +96,7 @@ class SuperFunctionsTest(object):
                               'grid20ang': 38928,
                               'grid25mo': 60098,
                               'grid20mo6-8': 89196,
-                              'valtest': 0}}
+                              'valtest': 17664}}
     sizes_t2 = {'nt': {'grid20': 28876,
                        'grid20ang': 28876,
                        'grid25mo': 40530,
@@ -106,7 +106,7 @@ class SuperFunctionsTest(object):
                           'grid20ang': 28584,
                           'grid25mo': 40582,
                           'grid20mo6-8': 55552,
-                          'valtest': 0}}
+                          'valtest': 17664}}
     sizes_m1e_8m10 = {'nt': {'grid20': 23989,
                              'grid20ang': 23989,
                              'grid25mo': 51871,
@@ -114,9 +114,9 @@ class SuperFunctionsTest(object):
                              'valtest': 17612},
                       'posix': {'grid20': 24041,
                                 'grid20ang': 24041,
-                                'grid25mo': 52428,
-                                'grid20mo6-8': 80254,
-                                'valtest': 0}}
+                                'grid25mo': 51659,
+                                'grid20mo6-8': 79154,
+                                'valtest': 17664}}
     sizes_i0x002f4 = {'nt': {'grid20': 17612,
                              'grid20ang': 17612,
                              'grid25mo': 25488,
@@ -124,9 +124,9 @@ class SuperFunctionsTest(object):
                              'valtest': 17612},
                       'posix': {'grid20': 17664,
                                 'grid20ang': 17664,
-                                'grid25mo': 28529,
-                                'grid20mo6-8': 37836,
-                                'valtest': 0}}
+                                'grid25mo': 25307,
+                                'grid20mo6-8': 34440,
+                                'valtest': 17664}}
     sizes_t8_i0x002f10 = {'nt': {'grid20': 19660,
                                  'grid20ang': 19660,
                                  'grid25mo': 30879,
@@ -134,9 +134,9 @@ class SuperFunctionsTest(object):
                                  'valtest': 17612},
                           'posix': {'grid20': 18038,
                                     'grid20ang': 18038,
-                                    'grid25mo': 32919,
-                                    'grid20mo6-8': 48774,
-                                    'valtest': 0}}
+                                    'grid25mo': 30667,
+                                    'grid20mo6-8': 45982,
+                                    'valtest': 17664}}
     sizes_si0x002f5 = {'nt': {'grid20': 17612,
                               'grid20ang': 17612,
                               'grid25mo': 22138,
@@ -144,9 +144,9 @@ class SuperFunctionsTest(object):
                               'valtest': 17612},
                        'posix': {'grid20': 17664,
                                  'grid20ang': 17664,
-                                 'grid25mo': 25359,
-                                 'grid20mo6-8': 31426,
-                                 'valtest': 0}}
+                                 'grid25mo': 21929,
+                                 'grid20mo6-8': 27516,
+                                 'valtest': 17664}}
 
     # bytes filesize match window
     fsize_delta = 5000 if bool(os.environ.get('TOX')) else 20
