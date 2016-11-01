@@ -12,7 +12,7 @@ Available on `PyPI <https://pypi.python.org/pypi/h5cube>`__
 (``pip install h5cube``).
 
 Source on `GitHub <https://github.com/bskinn/h5cube>`__
-(`v0.2 CHANGELOG <https://github.com/bskinn/h5cube/blob/v0.2/CHANGELOG.txt>`__).
+(`v0.3 CHANGELOG <https://github.com/bskinn/h5cube/blob/v0.3/CHANGELOG.txt>`__).
 
 Documentation at Read the Docs:
 
