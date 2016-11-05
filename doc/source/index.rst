@@ -6,12 +6,29 @@
 Welcome to h5cube's documentation!
 ==================================
 
-*Pending...*
+*[Purposes for this... lossless or intelligently lossy compression. But, since HDF5, also
+serves as a proposal of sorts for an HDF5 file specification for compressed
+CUBE data.]*
+
+*Only scalar volumetric data currently supported (one value per spatial point)*
+
+Link GitHub
+
+Link PyPI
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
+
+   usage
+   api
+   cubeformat
+   filespec
+   dependencies
+   references
+
+
 
 
 
