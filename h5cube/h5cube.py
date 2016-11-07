@@ -32,18 +32,53 @@ class AP(object):
     VALUE = 'value'
     ZERO = 'zero'
 
-# h5py constants
+
 class H5(object):
+    """ Names of ``.h5cube`` datasets
+
+    Array shapes and types are those of the data stored in ``.h5cube`` files.
+    """
+
+    #: First comment line
     COMMENT1 = 'COMMENT1'
+
+    #: Second comment line
     COMMENT2 = 'COMMENT2'
+
+    #: Number of atoms. Scalar |int|. Negative if dataset ID values are present.
     NATOMS = 'NATOMS'
+
+    #: Geometry origin vector. Length-3 |float|.
     ORIGIN = 'ORIGIN'
+
+    #: x-axis voxel dimension :math:`\mathsf{[0]}` and vector
+    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
     XAXIS = 'XAXIS'
+
+    #: y-axis voxel dimension :math:`\mathsf{[0]}` and vector
+    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
     YAXIS = 'YAXIS'
+
+    #: z-axis voxel dimension :math:`\mathsf{[0]}` and vector
+    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
     ZAXIS = 'ZAXIS'
+
+    #: System geometry. 3N x 5 |float|. Each line contains the
+    #: atomic number :math:`\mathsf{[0]}`,
+    #: atomic charge :math:`\mathsf{[1]}` (typically -- always? -- equal
+    #: to the atomic number), and
+    #: position :math:`\mathsf{[2:]}` of each atom
     GEOM = 'GEOM'
+
+    #: If :attr:`NATOMS` is negative, contains a scalar |int|
+    #: with the length of :attr:`DSET_IDS`.
     NUM_DSETS = 'NUM_DSETS'
+
+    #: If :attr:`NATOMS` is negative, a length-:attr:`NUM_DSETS` vector of
+    #: |int|. Else, an empty |float| |nparray|
     DSET_IDS = 'DSET_IDS'
+
+    #: **RESUME HERE**
     SIGNS = 'SIGNS'
     LOGDATA = 'LOGDATA'
 

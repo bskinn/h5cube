@@ -18,8 +18,8 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
 
 # -- General configuration ------------------------------------------------
 
@@ -32,12 +32,17 @@ needs_sphinx = '1.0'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
 ]
+
+# napoleon configuration
+napoleon_google_docstring = False
+napoleon_use_rtype = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -114,6 +119,51 @@ pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
+
+# Epilogue for all files
+rst_epilog = """
+.. |extlink| image:: /_static/extlink.svg
+
+.. |None| replace:: :obj:`None`
+
+.. |True| replace:: :obj:`True`
+
+.. |False| replace:: :obj:`False`
+
+.. |int| replace:: :obj:`int`
+
+.. |float| replace:: :obj:`float`
+
+.. |list| replace:: :obj:`list`
+
+.. |tuple| replace:: :obj:`tuple`
+
+.. |type| replace:: :obj:`type`
+
+.. |str| replace:: :obj:`str`
+
+.. |unicode| replace:: :obj:`unicode`
+
+.. |bool| replace:: :obj:`bool`
+
+.. |dict| replace:: :obj:`dict`
+
+.. |callable| replace:: :func:`callable`
+
+.. |re.compile| replace:: :func:`re.compile`
+
+.. |npfloat_| replace:: :mod:`np.float_ <numpy.doc.basics>`
+
+.. |npfloat| replace:: ``np.float``
+
+.. |nparray| replace:: :obj:`np.array <numpy.ndarray>`
+
+.. |br| raw:: html
+
+    <br />
+
+"""
+
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
 # keep_warnings = False
@@ -354,7 +404,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3.5',
                isphx_objpath.format(isphx_objstr.format('python'))
                if isphx_local else None),
-    'numpy': ('http://docs.scipy.org/doc/numpy/',
+    'numpy': ('https://docs.scipy.org/doc/numpy/',
               isphx_objpath.format(isphx_objstr.format('numpy'))
               if isphx_local else None),
     'h5py': ('http://docs.h5py.org/en/latest/',

@@ -14,6 +14,27 @@
 #
 # ------------------------------------------------------------------------------
 
+"""
+
+**Functions**
+
+.. autofunction:: cube_to_h5(cubepath, *, ...)
+
+.. autofunction:: h5_to_cube
+
+**Constants Classes**
+
+.. autoclass:: H5
+    :members:
+
+.. autoclass:: DEF
+    :members:
+
+.. autoclass:: EXIT
+    :members:
+
+"""
+
 from __future__ import absolute_import
 
 from .h5cube import cube_to_h5, h5_to_cube, H5, DEF, EXIT
