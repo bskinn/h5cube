@@ -34,9 +34,10 @@ class AP(object):
 
 
 class H5(object):
-    """ Names of ``.h5cube`` datasets
+    """ Names of ``.h5cube`` datasets and informational constants
 
     Array shapes and types are those of the data stored in ``.h5cube`` files.
+
     """
 
     #: First comment line
@@ -52,15 +53,15 @@ class H5(object):
     ORIGIN = 'ORIGIN'
 
     #: x-axis voxel dimension :math:`\mathsf{[0]}` and vector
-    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
+    #: :math:`\mathsf{[1\!:]}`. Length-4 |float|.
     XAXIS = 'XAXIS'
 
     #: y-axis voxel dimension :math:`\mathsf{[0]}` and vector
-    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
+    #: :math:`\mathsf{[1\!:]}`. Length-4 |float|.
     YAXIS = 'YAXIS'
 
     #: z-axis voxel dimension :math:`\mathsf{[0]}` and vector
-    #: :math:`\mathsf{[1:]}`. Length-4 |float|.
+    #: :math:`\mathsf{[1\!:]}`. Length-4 |float|.
     ZAXIS = 'ZAXIS'
 
     #: System geometry. 3N x 5 |float|. Each line contains the
@@ -78,20 +79,61 @@ class H5(object):
     #: |int|. Else, an empty |float| |nparray|
     DSET_IDS = 'DSET_IDS'
 
-    #: **RESUME HERE**
+    #: Algebraic signs of the volumetric data points (:math:`0.0` for
+    #: zero values). For non-orbital CUBE
+    #: files, :attr:`XAXIS[0] <XAXIS>` x :attr:`YAXIS[0] <YAXIS>` x
+    #: :attr:`ZAXIS[0] <ZAXIS>` array of |float|. For orbital CUBEs,
+    #: :attr:`XAXIS[0] <XAXIS>` x :attr:`YAXIS[0] <YAXIS>` x
+    #: :attr:`ZAXIS[0] <ZAXIS>` x :attr:`NUM_DSETS` array of |float|.
     SIGNS = 'SIGNS'
+
+    #: Base-10 logarithms of the absolute values of the volumetric
+    #: data points (:math:`0.0` for zero values). Dimension is identical
+    #: to that of :attr:`SIGNS`.
     LOGDATA = 'LOGDATA'
 
+    #: Value to be stored in :attr:`NUM_DSETS` when compressing non-orbital
+    #: CUBE files.
     VAL_NOT_ORBFILE = 0
+
 
 # Default values
 class DEF(object):
+    """ Default values for (de)compression option parameters.
+
+    No default is given for the `signed` parameter to :func:`cube_to_h5`
+    since it is irrelevant when :attr:`THRESH` is |False|.
+
+    Similarly, since `minmax` and `isofactor` are irrelevant when
+    :attr:`THRESH` is |False|, their default |None| values are specified
+    directly in the :func:`cube_to_h5` signature.
+
+    """
+
+    #: Default volumetric data truncation length during compression.
+    #:
+    #: .. todo:: Add link to User's Guide explanation of truncation when done.
     TRUNC = 5
+
+    #: Default output precision in decompressed CUBE file.
     PREC = 5
+
+    #: Default gzip compression level.
     COMP = 9
+
+    #: Default is not to delete source file in both compression and
+    #: decompression.
     DEL = False
+
+    #: Default is not to threshold the CUBE data when compressing.
     THRESH = False
+
+    #: Default is to clip small values to the thresholding limit with the
+    #: smallest magnitude, as opposed to coercing to zero.
+    #:
+    #: .. todo:: Add link to User's Guide explanation of value vs zero clipping
     CLIPZERO = False
+
 
 # Exit codes
 class EXIT(object):

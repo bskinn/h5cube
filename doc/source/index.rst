@@ -1,7 +1,7 @@
 .. h5cube documentation master file, created by
-   sphinx-quickstart on Sat Aug 20 15:45:05 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+    sphinx-quickstart on Sat Aug 20 15:45:05 2016.
+    You can adapt this file completely to your liking, but it should at least
+    contain the root `toctree` directive.
 
 Welcome to h5cube's documentation!
 ==================================
@@ -16,17 +16,25 @@ Link GitHub
 
 Link PyPI
 
+.. note::
+
+    Where used herein, the key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+    NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and
+    "OPTIONAL" are to be interpreted as described in :rfc:`2119`.
+
+
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   usage
-   api
-   cubeformat
-   filespec
-   dependencies
-   references
+    usage
+    api
+    cubeformat
+    filespec
+    dependencies
+    references
+    todolist
 
 
 
