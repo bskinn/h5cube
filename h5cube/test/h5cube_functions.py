@@ -54,7 +54,7 @@ class TestFunctionsMisc(ut.TestCase):
             i = iter(range(5))
             next(i)
             next(i)
-            self.assertEqual(_trynext(i, msg='Testing'), 2)
+            self.assertEqual(_trynext(i, name='Testing'), 2)
 
         with self.subTest(type='exhausted'):
             i = iter(range(2))

@@ -17,8 +17,10 @@
 # Global imports
 import sys
 
+
 # Argparse constants
 class AP(object):
+    """Constants for creating and using the :mod:`argparse` parser."""
     PATH = 'path'
     DELETE = 'delete'
     COMPRESS = 'compress'
@@ -137,14 +139,42 @@ class DEF(object):
 
 # Exit codes
 class EXIT(object):
+    """Exit codes for command line invocations. """
+
+    #: Exit success
     OK = 0
+
+    #: Catch-all exit with error
     GENERIC = 1
+
+    #: Exit with invalid command line parameters
     CMDLINE = 2
+
+    #: Exit with error due to failed file read
     FILEREAD = 4
+
+    #: Exit with error due to failed file write
     FILEWRITE = 8
 
+
 def _exp_format(val, prec):
-    """ [Docstring]
+    """ Convert a value to CUBE output format with a given precision.
+
+    Formatted values will always have at least one leading space;
+    non-negative values will have two.
+
+    Parameters
+    ----------
+    val :
+        |int| or |float| - Value to format
+
+    prec :
+        |int| - Number of digits to include past the decimal
+
+    Returns
+    -------
+    out :
+        |str| - Formatted value
 
     """
 
@@ -157,8 +187,32 @@ def _exp_format(val, prec):
     # Return the results
     return out
 
-def _trynext(iterator, msg):
-    """ [Docstring]
+
+def _trynext(iterator, name):
+    """ Encapsulates error handling if iterator unexpectedly exhausted.
+
+    If :exc:`~exceptions.StopIteration` raised, chain-raises a
+    :exc:`~exceptions.ValueError` with a more informative `msg`.
+
+    Otherwise, returns the next value in `iterator`.
+
+    Parameters
+    ----------
+    iterator :
+        Iterator to query with :func:`next`
+
+    name :
+        |str| - Descriptive name for `iterator`
+
+    Returns
+    -------
+    retval :
+        Value returned from `iterator`
+
+    Raises
+    ------
+    ~exceptions.ValueError :
+        If `iterator` is exhausted
 
     """
 
@@ -166,9 +220,10 @@ def _trynext(iterator, msg):
         retval = next(iterator)
     except StopIteration as e:
         raise ValueError("Data prematurely exhausted in '{0}' dataset"
-                         .format(msg)) from e
+                         .format(name)) from e
 
     return retval
+
 
 def _trynonext(iterator, msg):
     """ [Docstring]
