@@ -25,7 +25,10 @@ class TestFunctionsMisc(ut.TestCase):
 
     def test_FxnMisc_ExpFormat_Good(self):
         """ Validate correct scientific notation formatting for decompression """
-        from h5cube.h5cube import _exp_format as _ef
+        from h5cube.h5cube import _exp_format as _ef_fxn
+
+        def _ef(val, prec):
+            return _ef_fxn(prec).format(val)
 
         with self.subTest(type='typical'):
             self.assertEqual(_ef(0.0183, 5), "  1.83000E-02")
@@ -38,7 +41,10 @@ class TestFunctionsMisc(ut.TestCase):
 
     def test_FxnMisc_ExpFormat_Bad(self):
         """ Confirm _exp_format breaks when bad arguments are passed """
-        from h5cube.h5cube import _exp_format as _ef
+        from h5cube.h5cube import _exp_format as _ef_fxn
+
+        def _ef(val, prec):
+            return _ef_fxn(prec).format(val)
 
         with self.subTest(type='string'):
             self.assertRaises(ValueError, _ef, "abcd", 5)

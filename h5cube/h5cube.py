@@ -66,7 +66,7 @@ class EXIT(object):
     FILEREAD = 4
     FILEWRITE = 8
 
-def _exp_format(val, prec):
+def _exp_format(prec): #val, prec):
     """ [Docstring]
 
     """
@@ -75,9 +75,9 @@ def _exp_format(val, prec):
     # positive values with another leading space; negatives with the negative
     # sign; one digit in front of the decimal, 'dec' digits after.
     # Capital 'E' for the exponent.
-    out = " {{: #1.{0}E}}".format(prec).format(val)
+    out = " {{: #1.{0}E}}".format(prec)
 
-    # Return the results
+    # Return the result
     return out
 
 def _trynext(iterator, msg):
@@ -409,7 +409,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
                         f.write('\n')
 
             # Write the data blocks
-            # Pull them from the .h5cube file first
+            # Pull the entire dataset from the .h5cube file first
             # Value-by-value data retrieval was tried and found to be
             #  HORRIFICALLY slow. Chunk-by-chunk retrieval might be better
             #  speed-wise, but appears to decrease the .h5cube compression
@@ -418,22 +418,34 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
             logvals = hf[H5.LOGDATA].value
             outvals = np.multiply(signs, 10.0**logvals)
 
-            # Can just run a combinatorial iterator over the dimensions
-            # of the dataset
-            for i, t in enumerate(itt.product(*map(range, dims))):
-                # f.write(_exp_format(hf[H5.SIGNS].value[t] *
-                #                     10.**hf[H5.LOGDATA].value[t], prec))
-                # f.write(_exp_format(signs[t] * 10. ** logvals[t], prec))
-                f.write(_exp_format(outvals[t], prec))
+            # Pre-fetch the format string
+            num_format = _exp_format(prec)
 
-                # Newline to wrap at a max of six values per line, or if at
-                # the last entry of a z-iteration and at the last dataset,
-                # for orbital files.
-                if i % 6 == 5 or (t[2] == dims[2] - 1 and
-                                  t[-1] == dims[-1] - 1):
-                    f.write('\n')
+            # Can just run a combinatorial iterator over the first two
+            # dimensions of the dataset
+            for gt in itt.product(*map(range, dims[:2])):
+                # Reset the output accumulator
+                outstr = ""
 
-            # Always newlines at end
+                # Loop over all the data in each submatrix of the first
+                # two dimensions, flattening for straightforward
+                # iteration and converting to list since .format()
+                # goes appreciably faster when operating on native
+                # Python floats, rather than numpy types.
+                for i, v in enumerate(outvals[gt].flatten().tolist()):
+                    # Append the value to the accumulator string. +=
+                    # performed modestly better than .join().
+                    outstr += num_format.format(v)
+
+                    if i % 6 == 5:
+                        outstr += '\n'
+
+                if not outstr.endswith('\n'):
+                    outstr += '\n'
+
+                f.write(outstr)
+
+            # Always newlines at end of file
             f.write('\n\n')
 
     # If indicated, delete the source file
