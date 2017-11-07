@@ -247,8 +247,10 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
             """, re.X | re.I)
 
         # Agglomerated iterator for all remaining data in file
-        dataiter = itt.chain.from_iterable(p_scinot.finditer(l)
-                                           for l in datalines)
+        #matchiter = itt.chain.from_iterable(p_scinot.finditer(l)
+        #                                    for l in datalines)
+        #dataiter = (_.group(0) for _ in matchiter)
+        dataiter = itt.chain.from_iterable(_.split() for _ in datalines)
 
         # Preassign the calculated minmax values if isofactored thresh
         # is enabled
@@ -262,8 +264,9 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Fill the working numpy object, chaining a more informative exception
         # if the data pull fails
         try:
-            workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
-                                            dataiter))).reshape(dims)
+            workdataarr = np.fromiter(dataiter, np.float_, count=np.prod(dims))
+        #    workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
+        #                                    dataiter))).reshape(dims)
         except ValueError as e:
             raise ValueError('Error parsing volumetric data') from e
 
