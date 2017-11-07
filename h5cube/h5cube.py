@@ -80,6 +80,10 @@ def _exp_format(prec): #val, prec):
     # Return the result
     return out
 
+def _exp_interp(prec):
+    """Docstring."""
+    return " % .{0}E".format(prec)
+
 def _trynext(iterator, msg):
     """ [Docstring]
 
@@ -264,11 +268,14 @@ def cube_to_h5(cubepath, *, delsrc=DEF.DEL, comp=DEF.COMP, trunc=DEF.TRUNC,
         # Fill the working numpy object, chaining a more informative exception
         # if the data pull fails
         try:
-            workdataarr = np.fromiter(dataiter, np.float_, count=np.prod(dims))
+            workdataarr = np.fromiter(dataiter, np.float, count=np.prod(dims)).reshape(dims)
         #    workdataarr = np.array(list(map(lambda s: np.float(s.group(0)),
         #                                    dataiter))).reshape(dims)
         except ValueError as e:
             raise ValueError('Error parsing volumetric data') from e
+
+        # Should be no more values
+        _trynonext(dataiter, H5.LOGDATA)
 
         # Threshold. Where possible, spread out the np calls for easier
         # reading and calculate in-place for reduced RAM usage.
@@ -423,6 +430,7 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
 
             # Pre-fetch the format string
             num_format = _exp_format(prec)
+            num_interp = _exp_interp(prec)
 
             # Can just run a combinatorial iterator over the first two
             # dimensions of the dataset
@@ -438,7 +446,8 @@ def h5_to_cube(h5path, *, delsrc=DEF.DEL, prec=DEF.PREC):
                 for i, v in enumerate(outvals[gt].flatten().tolist()):
                     # Append the value to the accumulator string. +=
                     # performed modestly better than .join().
-                    outstr += num_format.format(v)
+                    #outstr += num_format.format(v)
+                    outstr += num_interp % v
 
                     if i % 6 == 5:
                         outstr += '\n'
